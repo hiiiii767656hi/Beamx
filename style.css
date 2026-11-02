@@ -1,0 +1,24 @@
+* { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+body, html { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: 'Segoe UI', Roboto, sans-serif; }
+
+#canvas-container { position: absolute; width: 100%; height: 100%; z-index: 1; }
+#ui-layer { position: absolute; width: 100%; height: 100%; z-index: 10; pointer-events: none; }
+
+#hud { position: absolute; top: 20px; left: 20px; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,0.8); }
+#mode-text { font-size: 18px; margin-bottom: 5px; color: #00cec9; text-transform: uppercase; letter-spacing: 1px; }
+#speed-display { font-size: 40px; font-weight: 900; font-style: italic; }
+.unit { font-size: 16px; font-weight: normal; opacity: 0.8; }
+
+#interaction-prompt { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #fff; background: rgba(0,0,0,0.6); padding: 10px 20px; border-radius: 8px; font-size: 16px; font-weight: bold; display: none; backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.2); }
+
+#btn-action { position: absolute; bottom: 120px; right: 30px; width: 80px; height: 80px; background: rgba(241, 196, 15, 0.2); border: 2px solid #f1c40f; color: #f1c40f; font-weight: 900; font-size: 16px; border-radius: 50%; display: none; justify-content: center; align-items: center; pointer-events: auto; backdrop-filter: blur(5px); cursor: pointer; transition: 0.2s; box-shadow: 0 0 15px rgba(241, 196, 15, 0.4); }
+#btn-action:active { background: rgba(241, 196, 15, 0.5); transform: scale(0.95); }
+
+.touch-controls { position: absolute; bottom: 30px; width: 100%; display: flex; justify-content: space-between; padding: 0 30px; pointer-events: none; }
+.control-group { display: flex; gap: 15px; pointer-events: auto; }
+.t-btn { width: 70px; height: 70px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); border-radius: 50%; display: flex; justify-content: center; align-items: center; color: #fff; font-size: 24px; backdrop-filter: blur(8px); touch-action: manipulation; transition: 0.1s; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+.t-btn:active { background: rgba(255,255,255,0.4); border-color: #fff; }
+
+@media (min-width: 1024px) {
+    .touch-controls { display: none; }
+}
