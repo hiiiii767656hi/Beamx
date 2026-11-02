@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Slow Roads Clone - Procedural Driving</title>
+    <title>Slow Roads Clone - Infinite Procedural Driving</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
         body, html { width: 100%; height: 100%; overflow: hidden; background: #87ceeb; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
@@ -13,16 +13,12 @@
         .speedometer { font-size: 42px; font-weight: 800; font-style: italic; text-shadow: 0 2px 10px rgba(0,0,0,0.3); }
         .unit { font-size: 16px; font-weight: normal; margin-left: 5px; opacity: 0.8; }
         
-        #controls-hint { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); color: rgba(255,255,255,0.8); font-size: 14px; background: rgba(0,0,0,0.4); padding: 8px 16px; border-radius: 20px; backdrop-filter: blur(5px); pointer-events: none; }
+        #controls-hint { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); color: rgba(255,255,255,0.9); font-size: 13px; background: rgba(0,0,0,0.4); padding: 8px 16px; border-radius: 20px; backdrop-filter: blur(5px); pointer-events: none; text-align: center; white-space: nowrap; }
         
         .touch-controls { position: absolute; bottom: 20px; width: 100%; display: flex; justify-content: space-between; padding: 0 20px; z-index: 10; pointer-events: none; }
         .control-group { display: flex; gap: 10px; pointer-events: auto; }
         .t-btn { width: 65px; height: 65px; background: rgba(255,255,255,0.25); border: 2px solid rgba(255,255,255,0.5); border-radius: 50%; display: flex; justify-content: center; align-items: center; color: white; font-weight: bold; font-size: 20px; backdrop-filter: blur(5px); touch-action: manipulation; }
         .t-btn:active { background: rgba(255,255,255,0.5); }
-        
-        @media (min-width: 768px) {
-            .touch-controls { display: none; }
-        }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
@@ -33,7 +29,7 @@
         <div class="speedometer"><span id="speed">0</span><span class="unit">KM/H</span></div>
     </div>
 
-    <div id="controls-hint">W, A, S, D veya Yön Tuşları ile Sürün</div>
+    <div id="controls-hint">Yön Tuşları veya Ekrandaki Butonlar ile Sürün</div>
 
     <div class="touch-controls">
         <div class="control-group">
@@ -46,6 +42,275 @@
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <script>
+        let scene, camera, renderer;
+        let car, speedEl;
+        let roadSegments = [];
+        const segmentLength = 20;
+        const totalSegments = 25;
+
+        let carState = {
+            pos: new THREE.Vector3(0, 0, 0),
+            speed: 0,
+            maxSpeed: 0.9,
+            accel: 0.012,
+            friction: 0.985,
+            angle: 0
+        };
+
+        const keys = { up: false, down: false, left: false, right: false };
+
+        function init() {
+            const container = document.getElementById('canvas-container');
+            speedEl = document.getElementById('speed');
+
+            // Sahne
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xaaccff);
+            scene.fog = new THREE.FogExp2(0xaaccff, 0.007);
+
+            // Kamera
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+            // WebGL Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // Işıklar
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const sun = new THREE.DirectionalLight(0xfff5ea, 1.2);
+            sun.position.set(100, 150, 50);
+            sun.castShadow = true;
+            sun.shadow.mapSize.width = 2048;
+            sun.shadow.mapSize.height = 2048;
+            scene.add(sun);
+
+            // Zemin
+            createTerrain();
+
+            // Araç
+            createCar();
+
+            // Sonsuz Yol Oluşturma
+            generateInitialRoad();
+
+            // Kontroller
+            setupInput();
+
+            window.addEventListener('resize', onWindowResize);
+            animate();
+        }
+
+        function createTerrain() {
+            const geo = new THREE.PlaneGeometry(1000, 1000, 40, 40);
+            const mat = new THREE.MeshStandardMaterial({ color: 0x55aa55, roughness: 0.9 });
+            const terrain = new THREE.Mesh(geo, mat);
+            terrain.rotation.x = -Math.PI / 2;
+            terrain.position.y = -0.1;
+            terrain.receiveShadow = true;
+            scene.add(terrain);
+        }
+
+        function createCar() {
+            const carGroup = new THREE.Group();
+
+            // Gövde
+            const bodyGeo = new THREE.BoxGeometry(1.8, 0.7, 3.8);
+            const bodyMat = new THREE.MeshStandardMaterial({ color: 0x2277fe, roughness: 0.2, metalness: 0.5 });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.position.y = 0.6;
+            body.castShadow = true;
+            carGroup.add(body);
+
+            // Kabin
+            const cabinGeo = new THREE.BoxGeometry(1.4, 0.6, 1.8);
+            const cabinMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.1 });
+            const cabin = new THREE.Mesh(cabinGeo, cabinMat);
+            cabin.position.set(0, 1.1, -0.2);
+            cabin.castShadow = true;
+            carGroup.add(cabin);
+
+            // Tekerlekler
+            const wheelGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.3, 16);
+            const wheelMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.8 });
+            wheelGeo.rotateZ(Math.PI / 2);
+
+            const positions = [
+                [-0.95, 0.35, 1.1], [0.95, 0.35, 1.1],
+                [-0.95, 0.35, -1.1], [0.95, 0.35, -1.1]
+            ];
+
+            positions.forEach(pos => {
+                const wheel = new THREE.Mesh(wheelGeo, wheelMat);
+                wheel.position.set(...pos);
+                wheel.castShadow = true;
+                carGroup.add(wheel);
+            });
+
+            scene.add(carGroup);
+            car = carGroup;
+        }
+
+        function createRoadSegment(zPos, curveOffset) {
+            const segmentGroup = new THREE.Group();
+
+            const roadGeo = new THREE.PlaneGeometry(10, segmentLength);
+            const roadMat = new THREE.MeshStandardMaterial({ color: 0x333338, roughness: 0.7 });
+            const road = new THREE.Mesh(roadGeo, roadMat);
+            road.rotation.x = -Math.PI / 2;
+            road.receiveShadow = true;
+            segmentGroup.add(road);
+
+            const lineGeo = new THREE.PlaneGeometry(0.3, segmentLength);
+            const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+
+            const leftLine = new THREE.Mesh(lineGeo, lineMat);
+            leftLine.rotation.x = -Math.PI / 2;
+            leftLine.position.set(-4.5, 0.01, 0);
+            segmentGroup.add(leftLine);
+
+            const rightLine = new THREE.Mesh(lineGeo, lineMat);
+            rightLine.rotation.x = -Math.PI / 2;
+            rightLine.position.set(4.5, 0.01, 0);
+            segmentGroup.add(rightLine);
+
+            if (Math.random() > 0.3) {
+                createTree(segmentGroup, -8 - Math.random() * 15);
+                createTree(segmentGroup, 8 + Math.random() * 15);
+            }
+
+            segmentGroup.position.set(curveOffset, 0, zPos);
+            scene.add(segmentGroup);
+
+            return { group: segmentGroup, z: zPos, x: curveOffset };
+        }
+
+        function createTree(parent, xPos) {
+            const treeGroup = new THREE.Group();
+            
+            const trunk = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.3, 0.4, 2),
+                new THREE.MeshStandardMaterial({ color: 0x5a3d28 })
+            );
+            trunk.position.y = 1;
+            trunk.castShadow = true;
+            treeGroup.add(trunk);
+
+            const leaves = new THREE.Mesh(
+                new THREE.ConeGeometry(2, 4, 5),
+                new THREE.MeshStandardMaterial({ color: 0x2e7d32, roughness: 0.8 })
+            );
+            leaves.position.y = 3;
+            leaves.castShadow = true;
+            treeGroup.add(leaves);
+
+            treeGroup.position.set(xPos, 0, (Math.random() - 0.5) * segmentLength);
+            parent.add(treeGroup);
+        }
+
+        function generateInitialRoad() {
+            let currentZ = 0;
+            let currentX = 0;
+
+            for (let i = 0; i < totalSegments; i++) {
+                currentZ -= segmentLength;
+                currentX += Math.sin(i * 0.3) * 2;
+                const seg = createRoadSegment(currentZ, currentX);
+                roadSegments.push(seg);
+            }
+        }
+
+        function updateRoad() {
+            const lastSeg = roadSegments[roadSegments.length - 1];
+            const firstSeg = roadSegments[0];
+
+            if (carState.pos.z - lastSeg.z < totalSegments * segmentLength) {
+                const newZ = firstSeg.z - segmentLength;
+                const newX = firstSeg.x + Math.sin(newZ * 0.02) * 3;
+                
+                const recycledSeg = roadSegments.pop();
+                recycledSeg.group.position.set(newX, 0, newZ);
+                recycledSeg.z = newZ;
+                recycledSeg.x = newX;
+                
+                roadSegments.unshift(recycledSeg);
+            }
+        }
+
+        function setupInput() {
+            window.addEventListener('keydown', e => setKey(e.code, true));
+            window.addEventListener('keyup', e => setKey(e.code, false));
+
+            bindTouch('btn-up', 'up');
+            bindTouch('btn-down', 'down');
+            bindTouch('btn-left', 'left');
+            bindTouch('btn-right', 'right');
+        }
+
+        function setKey(code, state) {
+            if (code === 'KeyW' || code === 'ArrowUp') keys.up = state;
+            if (code === 'KeyS' || code === 'ArrowDown') keys.down = state;
+            if (code === 'KeyA' || code === 'ArrowLeft') keys.left = state;
+            if (code === 'KeyD' || code === 'ArrowRight') keys.right = state;
+        }
+
+        function bindTouch(id, key) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.addEventListener('touchstart', e => { e.preventDefault(); keys[key] = true; });
+            el.addEventListener('touchend', e => { e.preventDefault(); keys[key] = false; });
+        }
+
+        function updatePhysics() {
+            if (keys.up) carState.speed = Math.min(carState.speed + carState.accel, carState.maxSpeed);
+            else if (keys.down) carState.speed = Math.max(carState.speed - carState.accel, -carState.maxSpeed * 0.3);
+            else carState.speed *= carState.friction;
+
+            if (Math.abs(carState.speed) > 0.001) {
+                const dir = carState.speed > 0 ? 1 : -1;
+                if (keys.left) carState.angle += 0.025 * dir;
+                if (keys.right) carState.angle -= 0.025 * dir;
+            }
+
+            carState.pos.x += Math.sin(carState.angle) * carState.speed * 12;
+            carState.pos.z -= Math.cos(carState.angle) * carState.speed * 12;
+
+            car.position.copy(carState.pos);
+            car.rotation.y = carState.angle;
+
+            updateRoad();
+
+            const camOffset = new THREE.Vector3(
+                Math.sin(carState.angle) * 7,
+                3.5,
+                -Math.cos(carState.angle) * 7
+            );
+            const targetCamPos = carState.pos.clone().add(camOffset);
+            camera.position.lerp(targetCamPos, 0.08);
+            camera.lookAt(carState.pos.clone().add(new THREE.Vector3(0, 0.8, 0)));
+
+            speedEl.innerText = Math.round(Math.abs(carState.speed) * 160);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            updatePhysics();
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        init();
+    </script>
 </body>
 </html>
