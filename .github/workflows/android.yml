@@ -1,0 +1,51 @@
+name: android-apk
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kodu Cek
+        uses: actions/checkout@v4
+
+      - name: Zip Cikar
+        run: |
+          sudo apt-get update && sudo apt-get install -y unzip
+          if [ -f "beamx-source.zip" ]; then
+            unzip -o beamx-source.zip -d .
+          fi
+
+      - name: Java 17 Kur
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Gradle Kur
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Izin Ver
+        run: |
+          chmod +x android/gradlew || true
+          chmod +x gradlew || true
+
+      - name: APK Derle
+        run: |
+          if [ -d "android" ]; then
+            cd android && ./gradlew assembleRelease --no-daemon
+          elif [ -f "gradlew" ]; then
+            ./gradlew assembleRelease --no-daemon
+          else
+            gradle assembleRelease --no-daemon
+          fi
+
+      - name: APK Yukle
+        uses: actions/upload-artifact@v4
+        with:
+          name: BeamX-APK
+          path: |
+            **/outputs/apk/**/*.apk
