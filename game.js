@@ -1,7 +1,7 @@
 const http = require('http');
 const crypto = require('crypto');
 
-const PORT = 7777;
+const PORT = process.env.PORT || 7777;
 const WS_MAGIC_STRING = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 
 const clients = new Set();
