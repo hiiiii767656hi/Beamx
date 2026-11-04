@@ -1,1476 +1,928 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>3D Multiplayer Physics Sandbox</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
-    <style>
-        body { margin: 0; overflow: hidden; background-color: #000; color: white; font-family: 'Inter', sans-serif; touch-action: none; }
-        canvas { display: block; width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
-        .no-select { user-select: none; -webkit-user-select: none; }
-        
-        /* Crosshair */
-        #crosshair {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 12px; height: 12px; pointer-events: none; z-index: 20;
-        }
-        #crosshair::before, #crosshair::after { content: ''; position: absolute; background: rgba(0, 255, 255, 0.8); }
-        #crosshair::before { top: 5px; left: 0; width: 12px; height: 2px; }
-        #crosshair::after { top: 0; left: 5px; width: 2px; height: 12px; }
-
-        /* Top Action Bar */
-        #topBar {
-            position: absolute; top: 20px; left: 20px; right: 20px;
-            display: flex; justify-content: space-between; align-items: center; z-index: 30; pointer-events: none;
-        }
-        .ui-btn {
-            background: rgba(0, 0, 0, 0.65); border: 2px solid rgba(0, 255, 255, 0.5); color: white;
-            padding: 8px 14px; border-radius: 8px; font-weight: bold; cursor: pointer; pointer-events: auto;
-            backdrop-filter: blur(4px); transition: all 0.2s; text-shadow: 1px 1px 2px black;
-        }
-        .ui-btn:hover { background: rgba(0, 255, 255, 0.2); transform: scale(1.05); }
-        .ui-btn:active { transform: scale(0.95); }
-
-        .icon-btn { font-size: 1.25rem; padding: 6px 12px; border-radius: 10px; border-color: rgba(255, 255, 255, 0.35); }
-
-        /* Vehicle Prompt Banner */
-        #vehiclePrompt {
-            position: absolute; bottom: 110px; left: 50%; transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.75); border: 2px solid #0ff; color: #0ff;
-            padding: 8px 20px; border-radius: 999px; font-weight: bold; font-size: 0.95rem;
-            z-index: 25; pointer-events: auto; cursor: pointer; backdrop-filter: blur(4px);
-            box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
-        }
-
-        /* Settings Modal */
-        #settingsModal {
-            display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(10, 15, 30, 0.96); border: 2px solid #0ff; border-radius: 14px;
-            padding: 20px 24px; z-index: 50; width: 350px; max-width: 92vw; max-height: 85vh; overflow-y: auto;
-            box-shadow: 0 0 25px rgba(0, 255, 255, 0.3); pointer-events: auto; backdrop-filter: blur(12px);
-        }
-        .modal-header { font-size: 1.25rem; font-weight: bold; margin-bottom: 14px; color: #0ff; border-bottom: 1px solid rgba(0,255,255,0.3); padding-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
-        .setting-row { margin-bottom: 12px; }
-        .setting-label { display: flex; justify-content: space-between; font-size: 0.85rem; color: #cbd5e1; margin-bottom: 4px; font-weight: 600; }
-        
-        /* Chat System */
-        #chatContainer {
-            position: absolute; bottom: 20px; left: 20px; width: 300px; max-height: 250px;
-            display: flex; flex-direction: column; justify-content: flex-end; z-index: 30; pointer-events: none;
-        }
-        #chatMessages {
-            overflow-y: auto; max-height: 200px; padding-bottom: 8px; pointer-events: auto;
-            text-shadow: 1px 1px 2px black; font-size: 0.9rem; mask-image: linear-gradient(to top, black 80%, transparent 100%);
-        }
-        .chat-msg { margin-bottom: 4px; line-height: 1.2; word-wrap: break-word; }
-        #chatInputContainer { display: flex; opacity: 0.8; transition: opacity 0.2s; pointer-events: auto; }
-        #chatInputContainer:focus-within { opacity: 1; }
-        #chatInput {
-            flex-grow: 1; background: rgba(0,0,0,0.6); border: 1px solid #333; color: white;
-            padding: 8px; border-radius: 4px; outline: none;
-        }
-        #chatInput:focus { border-color: #0ff; background: rgba(0,0,0,0.8); }
-
-        /* Mobile Controls */
-        #mobileControls { display: none; position: absolute; inset: 0; z-index: 15; pointer-events: none; }
-        @media (pointer: coarse) {
-            #mobileControls { display: block; }
-            #instructions { display: none !important; }
-            #chatContainer { bottom: 160px; width: 250px; }
-        }
-        
-        .joystick-zone {
-            position: absolute; bottom: 20px; width: 120px; height: 120px; 
-            background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.2); 
-            border-radius: 50%; display: flex; align-items: center; justify-content: center; 
-            touch-action: none; pointer-events: auto;
-        }
-        #joyLeft { left: 20px; }
-        .joystick-knob { width: 50px; height: 50px; background: rgba(255,255,255,0.5); border-radius: 50%; pointer-events: none; }
-        
-        #rightTouchZone {
-            position: absolute; right: 0; top: 0; width: 50%; height: 100%; 
-            pointer-events: auto; touch-action: none; z-index: 1;
-        }
-
-        .action-btn {
-            position: absolute; width: 60px; height: 60px; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-weight: bold; pointer-events: auto; touch-action: none;
-            border: 2px solid rgba(255,255,255,0.4); text-shadow: 1px 1px 2px black;
-            font-size: 0.8rem;
-        }
-        #jumpBtnMobile { bottom: 30px; right: 100px; background: rgba(59, 130, 246, 0.6); }
-        #shootBtnMobile { bottom: 100px; right: 30px; background: rgba(239, 68, 68, 0.6); }
-        #carBtnMobile { bottom: 100px; right: 100px; background: rgba(16, 185, 129, 0.7); }
-        .action-btn:active { transform: scale(0.9); opacity: 0.8; }
-
-        #startScreen { z-index: 50; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Multiplayer Physics Sandbox</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
+<style>
+body{margin:0;overflow:hidden;background:#000;color:#fff;font-family:Inter,system-ui,sans-serif;touch-action:none}
+canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-index:1}
+.no-select{user-select:none;-webkit-user-select:none}
+#crosshair{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:12px;height:12px;pointer-events:none;z-index:20}
+#crosshair::before,#crosshair::after{content:'';position:absolute;background:rgba(0,255,255,.8)}
+#crosshair::before{top:5px;left:0;width:12px;height:2px}
+#crosshair::after{top:0;left:5px;width:2px;height:12px}
+#topBar{position:absolute;top:20px;left:20px;right:20px;display:flex;justify-content:space-between;align-items:center;z-index:30;pointer-events:none}
+.ui-btn{background:rgba(0,0,0,.65);border:2px solid rgba(0,255,255,.5);color:#fff;padding:8px 14px;border-radius:8px;font-weight:bold;cursor:pointer;pointer-events:auto;backdrop-filter:blur(4px)}
+.ui-btn:active{transform:scale(.95)}
+.icon-btn{font-size:1.25rem;padding:6px 12px}
+#vehiclePrompt{position:absolute;bottom:110px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.75);border:2px solid #0ff;color:#0ff;padding:8px 20px;border-radius:999px;font-weight:bold;font-size:.95rem;z-index:25;cursor:pointer;white-space:nowrap}
+#settingsModal{display:none;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(10,15,30,.96);border:2px solid #0ff;border-radius:14px;padding:20px 24px;z-index:50;width:350px;max-width:92vw;max-height:85vh;overflow-y:auto}
+.modal-header{font-size:1.25rem;font-weight:bold;margin-bottom:14px;color:#0ff;border-bottom:1px solid rgba(0,255,255,.3);padding-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+.setting-row{margin-bottom:12px}
+.setting-label{display:flex;justify-content:space-between;font-size:.85rem;color:#cbd5e1;margin-bottom:4px;font-weight:600}
+#chatContainer{position:absolute;bottom:20px;left:20px;width:300px;max-height:250px;display:flex;flex-direction:column;justify-content:flex-end;z-index:30;pointer-events:none}
+#chatMessages{overflow-y:auto;max-height:200px;padding-bottom:8px;pointer-events:auto;text-shadow:1px 1px 2px #000;font-size:.9rem}
+.chat-msg{margin-bottom:4px;line-height:1.2;word-wrap:break-word}
+#chatInput{flex-grow:1;background:rgba(0,0,0,.6);border:1px solid #333;color:#fff;padding:8px;border-radius:4px;outline:none;pointer-events:auto}
+#mobileControls{display:none;position:absolute;inset:0;z-index:15;pointer-events:none}
+@media (pointer:coarse){#mobileControls{display:block}#instructions{display:none!important}#chatContainer{bottom:160px;width:250px}}
+.joystick-zone{position:absolute;bottom:20px;left:20px;width:120px;height:120px;background:rgba(255,255,255,.1);border:2px solid rgba(255,255,255,.2);border-radius:50%;display:flex;align-items:center;justify-content:center;touch-action:none;pointer-events:auto;z-index:10}
+.joystick-knob{width:50px;height:50px;background:rgba(255,255,255,.5);border-radius:50%;pointer-events:none}
+#rightTouchZone{position:absolute;right:0;top:0;width:50%;height:100%;pointer-events:auto;touch-action:none;z-index:1}
+.action-btn{position:absolute;width:60px;height:60px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;pointer-events:auto;touch-action:none;border:2px solid rgba(255,255,255,.4);font-size:.8rem;z-index:10}
+#jumpBtnMobile{bottom:30px;right:100px;background:rgba(59,130,246,.6)}
+#shootBtnMobile{bottom:100px;right:30px;background:rgba(239,68,68,.6)}
+#carBtnMobile{bottom:100px;right:100px;background:rgba(16,185,129,.7)}
+#startScreen{z-index:50}
+</style>
 </head>
 <body>
-
-    <!-- Start Screen -->
-    <div id="startScreen" class="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/90 backdrop-blur-sm no-select px-4">
-        <h1 class="text-5xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-fuchsia-500 mb-2 drop-shadow-[0_0_15px_rgba(0,255,255,0.5)] text-center tracking-tighter">PHYSICS SANDBOX</h1>
-        <p class="text-lg md:text-xl text-fuchsia-300 mb-6 tracking-widest uppercase font-semibold text-center">Multiplayer + Drivable Cars</p>
-        
-        <!-- Server IP Input -->
-        <div class="flex flex-col items-center gap-3 mb-6 w-80 max-w-full pointer-events-auto">
-            <label for="serverIpInput" class="text-xs uppercase tracking-wider text-cyan-300 font-bold">Server IP / Render URL</label>
-            <div class="flex w-full gap-2">
-                <input
-                    id="serverIpInput"
-                    type="text"
-                    value="beamx.onrender.com"
-                    placeholder="beamx.onrender.com veya 127.0.0.1:7777"
-                    class="flex-grow px-4 py-2 bg-black/70 border-2 border-cyan-500/60 rounded-lg text-white font-mono text-sm focus:outline-none focus:border-cyan-300"
-                />
-                <button id="connectBtn" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg text-sm transition-colors">
-                    Connect
-                </button>
-            </div>
-        </div>
-
-        <p id="authStatus" class="text-gray-400 mb-6 font-mono text-sm text-center">Sunucu adresini girip Connect'e basın veya doğrudan başlatın</p>
-
-        <div class="flex flex-wrap gap-4 justify-center">
-            <button id="playBtn" class="px-10 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold rounded-full text-xl md:text-2xl transition-transform hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(6,182,212,0.6)] pointer-events-auto border-2 border-cyan-300">
-                ENTER PLAYGROUND
-            </button>
-            <button id="startFullscreenBtn" class="px-6 py-4 bg-gray-800 hover:bg-gray-700 text-cyan-300 font-bold rounded-full text-lg transition-transform hover:scale-105 active:scale-95 pointer-events-auto border-2 border-cyan-500/40">
-                ⛶ Tam Ekran
-            </button>
-        </div>
-
-        <p id="instructions" class="mt-8 text-gray-400 text-center max-w-lg bg-black/40 p-4 rounded-xl border border-gray-700 text-sm">
-            <strong class="text-white">Masaüstü:</strong> Fareyi kilitlemek için tıklayın. WASD: Hareket / Sürüş. Space: Zıpla / Fren.<br>
-            Arabaya binmek veya inmek için <strong class="text-cyan-400">[E]</strong> tuşuna, tam ekran için <strong class="text-cyan-400">[F]</strong> tuşuna basın.<br>
-            Sol Tık: Ateş Et. ESC: Fare kilidini açar.
-        </p>
+<div id="startScreen" class="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/90 no-select px-4">
+  <h1 class="text-5xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-fuchsia-500 mb-2 text-center tracking-tighter">PHYSICS SANDBOX</h1>
+  <p class="text-lg text-fuchsia-300 mb-6 tracking-widest uppercase font-semibold text-center">Multiplayer + Gerçek Fizik</p>
+  <div class="flex flex-col items-center gap-3 mb-6 w-80 max-w-full">
+    <label for="serverIpInput" class="text-xs uppercase tracking-wider text-cyan-300 font-bold">Server IP / Render URL</label>
+    <div class="flex w-full gap-2">
+      <input id="serverIpInput" type="text" value="beamx.onrender.com" class="flex-grow px-4 py-2 bg-black/70 border-2 border-cyan-500/60 rounded-lg text-white font-mono text-sm focus:outline-none focus:border-cyan-300">
+      <button id="connectBtn" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg text-sm">Connect</button>
     </div>
-
-    <!-- UI Overlay -->
-    <div id="topBar" class="no-select">
-        <div class="flex gap-2 md:gap-3 flex-wrap">
-            <button id="spawnBoxBtn" class="ui-btn text-xs md:text-sm">Spawn Box</button>
-            <button id="spawnBallBtn" class="ui-btn text-xs md:text-sm">Spawn Ball</button>
-            <button id="spawnCarBtn" class="ui-btn border-fuchsia-400 text-xs md:text-sm">Spawn Car 🚗</button>
-        </div>
-        <div class="flex gap-2">
-            <button id="fullscreenBtn" class="ui-btn icon-btn" title="Tam Ekran (F)">⛶</button>
-            <button id="settingsBtn" class="ui-btn icon-btn" title="Ayarlar">⚙️</button>
-        </div>
-    </div>
-
-    <!-- Enter / Exit Car Prompt -->
-    <div id="vehiclePrompt" class="hidden no-select">Press [E] to Enter Car</div>
-
-    <!-- Expanded Settings Modal -->
-    <div id="settingsModal" class="no-select">
-        <div class="modal-header">
-            <span>⚙️ Oyun Ayarları</span>
-            <span id="fpsCounter" class="text-xs font-mono text-emerald-400">60 FPS</span>
-        </div>
-
-        <!-- Oyuncu Rengi -->
-        <div class="setting-row flex items-center justify-between">
-            <span class="text-sm text-gray-200 font-semibold">Oyuncu Rengi</span>
-            <input type="color" id="playerColorPicker" class="w-10 h-8 rounded cursor-pointer bg-transparent border border-gray-600">
-        </div>
-
-        <!-- Hassasiyet (Sensitivity) -->
-        <div class="setting-row">
-            <div class="setting-label">
-                <span>Kamera Hassasiyeti</span>
-                <span id="sensVal">1.0x</span>
-            </div>
-            <input type="range" id="sensSlider" min="0.2" max="3.0" step="0.1" value="1.0" class="w-full accent-cyan-400 cursor-pointer">
-        </div>
-
-        <!-- Kamera Açısı (FOV) -->
-        <div class="setting-row">
-            <div class="setting-label">
-                <span>Görüş Açısı (FOV)</span>
-                <span id="fovVal">75°</span>
-            </div>
-            <input type="range" id="fovSlider" min="60" max="110" step="1" value="75" class="w-full accent-cyan-400 cursor-pointer">
-        </div>
-
-        <!-- Yerçekimi (Gravity) -->
-        <div class="setting-row">
-            <div class="setting-label">
-                <span>Yerçekimi (Gravity)</span>
-                <span id="gravVal">Normal (-25)</span>
-            </div>
-            <input type="range" id="gravSlider" min="5" max="50" step="1" value="25" class="w-full accent-fuchsia-400 cursor-pointer">
-        </div>
-
-        <!-- Sis Yoğunluğu (Fog) -->
-        <div class="setting-row">
-            <div class="setting-label">
-                <span>Sis Yoğunluğu</span>
-                <span id="fogVal">Normal</span>
-            </div>
-            <input type="range" id="fogSlider" min="0" max="0.03" step="0.002" value="0.012" class="w-full accent-cyan-400 cursor-pointer">
-        </div>
-
-        <!-- Checkbox Seçenekleri -->
-        <label class="flex items-center space-x-3 text-gray-200 cursor-pointer mb-3 text-sm">
-            <input type="checkbox" id="ragdollToggle" checked class="w-4 h-4 accent-cyan-500 bg-gray-800 border-gray-600 rounded">
-            <span>Vurulunca Parçalanma (Ragdoll)</span>
-        </label>
-
-        <label class="flex items-center space-x-3 text-gray-200 cursor-pointer mb-3 text-sm">
-            <input type="checkbox" id="shadowsToggle" checked class="w-4 h-4 accent-cyan-500 bg-gray-800 border-gray-600 rounded">
-            <span>Gölgeleri Etkinleştir (Yüksek Kalite)</span>
-        </label>
-
-        <label class="flex items-center space-x-3 text-gray-200 cursor-pointer mb-4 text-sm">
-            <input type="checkbox" id="invertYToggle" class="w-4 h-4 accent-cyan-500 bg-gray-800 border-gray-600 rounded">
-            <span>Dikey Fare Ekseni Ters (Invert Y)</span>
-        </label>
-
-        <!-- Hızlı Aksiyon Butonları -->
-        <div class="grid grid-cols-2 gap-2 mb-3">
-            <button id="modalFullscreenBtn" class="py-2 bg-cyan-700 hover:bg-cyan-600 text-white rounded font-bold text-xs transition-colors">
-                ⛶ Tam Ekran
-            </button>
-            <button id="respawnBtn" class="py-2 bg-amber-600 hover:bg-amber-500 text-white rounded font-bold text-xs transition-colors">
-                🔄 Yeniden Doğ
-            </button>
-        </div>
-
-        <button id="closeSettingsBtn" class="w-full py-2 bg-gray-700 hover:bg-gray-600 text-white rounded font-bold transition-colors text-sm">
-            Kapat
-        </button>
-    </div>
-
-    <!-- Chat Overlay -->
-    <div id="chatContainer" class="no-select">
-        <div id="chatMessages"></div>
-        <div id="chatInputContainer">
-            <input type="text" id="chatInput" placeholder="Sohbet için Enter'a basın..." autocomplete="off" maxlength="100">
-        </div>
-    </div>
-
-    <div id="crosshair" class="hidden"></div>
-
-    <!-- Mobile Controls -->
-    <div id="mobileControls" class="no-select">
-        <div id="rightTouchZone"></div>
-        <div id="joyLeft" class="joystick-zone" style="z-index: 10;"><div id="knobLeft" class="joystick-knob"></div></div>
-        <div id="jumpBtnMobile" class="action-btn" style="z-index: 10;">JUMP</div>
-        <div id="shootBtnMobile" class="action-btn" style="z-index: 10;">FIRE</div>
-        <div id="carBtnMobile" class="action-btn" style="z-index: 10;">CAR</div>
-    </div>
-
-    <script>
-        // --- Game State & Settings Variables ---
-        let isPlaying = false;
-        let isShatteredLocal = false;
-        let ragdollEnabled = true;
-        let lookSensitivity = 1.0;
-        let invertY = false;
-        let userId = 'u_' + Math.random().toString(36).substring(2, 9);
-        let myColor = '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
-
-        const startScreen = document.getElementById('startScreen');
-        const playBtn = document.getElementById('playBtn');
-        const connectBtn = document.getElementById('connectBtn');
-        const serverIpInput = document.getElementById('serverIpInput');
-        const authStatus = document.getElementById('authStatus');
-        const crosshair = document.getElementById('crosshair');
-        const chatInput = document.getElementById('chatInput');
-        const chatMessages = document.getElementById('chatMessages');
-        const settingsModal = document.getElementById('settingsModal');
-        const vehiclePrompt = document.getElementById('vehiclePrompt');
-        const playerColorPicker = document.getElementById('playerColorPicker');
-        playerColorPicker.value = myColor;
-
-        // --- Fullscreen Support ---
-        function toggleFullscreen() {
-            const docEl = document.documentElement;
-            const isFs = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
-            if (!isFs) {
-                if (docEl.requestFullscreen) docEl.requestFullscreen().catch(() => {});
-                else if (docEl.webkitRequestFullscreen) docEl.webkitRequestFullscreen();
-                else if (docEl.msRequestFullscreen) docEl.msRequestFullscreen();
-            } else {
-                if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
-                else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-                else if (document.msExitFullscreen) document.msExitFullscreen();
-            }
-        }
-
-        document.getElementById('fullscreenBtn').addEventListener('click', toggleFullscreen);
-        document.getElementById('startFullscreenBtn').addEventListener('click', toggleFullscreen);
-        document.getElementById('modalFullscreenBtn').addEventListener('click', toggleFullscreen);
-
-        // --- Physics (Cannon.js) Setup ---
-        const world = new CANNON.World();
-        world.gravity.set(0, -25, 0);
-        world.broadphase = new CANNON.SAPBroadphase(world);
-        world.solver.iterations = 15;
-
-        const physicsMaterial = new CANNON.Material("standard");
-        const physicsContactMaterial = new CANNON.ContactMaterial(
-            physicsMaterial, physicsMaterial,
-            { friction: 0.0, restitution: 0.0, contactEquationStiffness: 1e8, contactEquationRelaxation: 3 }
-        );
-        world.addContactMaterial(physicsContactMaterial);
-        world.defaultContactMaterial = physicsContactMaterial;
-
-        // --- Graphics (Three.js) Setup ---
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x050014);
-        scene.fog = new THREE.FogExp2(0x050014, 0.012);
-
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-
-        const playerObj = new THREE.Object3D();
-        const yawObj = new THREE.Object3D();
-        const pitchObj = new THREE.Object3D();
-        scene.add(playerObj);
-        playerObj.add(yawObj);
-        yawObj.add(pitchObj);
-        pitchObj.add(camera);
-        pitchObj.position.y = 1.2;
-
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        document.body.insertBefore(renderer.domElement, document.body.firstChild);
-
-        const ambient = new THREE.AmbientLight(0x404060, 0.6);
-        scene.add(ambient);
-        const moonLight = new THREE.DirectionalLight(0x55aaff, 0.8);
-        moonLight.position.set(50, 100, -50);
-        moonLight.castShadow = true;
-        moonLight.shadow.camera.left = -120; moonLight.shadow.camera.right = 120;
-        moonLight.shadow.camera.top = 120; moonLight.shadow.camera.bottom = -120;
-        scene.add(moonLight);
-
-        // --- Settings Event Listeners ---
-        document.getElementById('settingsBtn').addEventListener('click', () => {
-            settingsModal.style.display = settingsModal.style.display === 'block' ? 'none' : 'block';
-            if (settingsModal.style.display === 'block' && document.pointerLockElement) {
-                document.exitPointerLock();
-            }
-        });
-        document.getElementById('closeSettingsBtn').addEventListener('click', () => {
-            settingsModal.style.display = 'none';
-        });
-
-        playerColorPicker.addEventListener('input', (e) => {
-            myColor = e.target.value;
-            syncPlayerState();
-        });
-
-        document.getElementById('sensSlider').addEventListener('input', (e) => {
-            lookSensitivity = parseFloat(e.target.value);
-            document.getElementById('sensVal').innerText = lookSensitivity.toFixed(1) + 'x';
-        });
-
-        document.getElementById('fovSlider').addEventListener('input', (e) => {
-            const fov = parseInt(e.target.value, 10);
-            camera.fov = fov;
-            camera.updateProjectionMatrix();
-            document.getElementById('fovVal').innerText = fov + '°';
-        });
-
-        document.getElementById('gravSlider').addEventListener('input', (e) => {
-            const g = parseInt(e.target.value, 10);
-            world.gravity.set(0, -g, 0);
-            document.getElementById('gravVal').innerText = `-${g}`;
-        });
-
-        document.getElementById('fogSlider').addEventListener('input', (e) => {
-            const density = parseFloat(e.target.value);
-            scene.fog.density = density;
-            document.getElementById('fogVal').innerText = density === 0 ? 'Kapalı' : density.toFixed(3);
-        });
-
-        document.getElementById('ragdollToggle').addEventListener('change', (e) => {
-            ragdollEnabled = e.target.checked;
-        });
-
-        document.getElementById('shadowsToggle').addEventListener('change', (e) => {
-            renderer.shadowMap.enabled = e.target.checked;
-            moonLight.castShadow = e.target.checked;
-            scene.traverse(obj => {
-                if (obj.material) obj.material.needsUpdate = true;
-            });
-        });
-
-        document.getElementById('invertYToggle').addEventListener('change', (e) => {
-            invertY = e.target.checked;
-        });
-
-        document.getElementById('respawnBtn').addEventListener('click', () => {
-            if (drivingCar) toggleEnterExitCar();
-            playerBody.position.set(0, 15, 8);
-            playerBody.velocity.set(0, 0, 0);
-            settingsModal.style.display = 'none';
-        });
-
-        // --- Map Generator ---
-        const intersectableObjects = [];
-
-        function createCheckerboard() {
-            const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 512;
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#0a0a1a'; ctx.fillRect(0, 0, 512, 512);
-            ctx.fillStyle = '#1a1a3a';
-            for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) if ((i + j) % 2 === 0) ctx.fillRect(i * 64, j * 64, 64, 64);
-            const tex = new THREE.CanvasTexture(canvas);
-            tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-            tex.repeat.set(25, 25);
-            return tex;
-        }
-
-        function addStaticBlock(x, y, z, w, h, d, colorHex, isNeon = false) {
-            const mat = new THREE.MeshStandardMaterial({
-                color: colorHex, roughness: isNeon ? 0.2 : 0.7,
-                emissive: isNeon ? colorHex : 0x000000, emissiveIntensity: isNeon ? 0.5 : 0
-            });
-            const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-            mesh.position.set(x, y + h / 2, z);
-            mesh.castShadow = true; mesh.receiveShadow = true;
-            scene.add(mesh);
-            intersectableObjects.push(mesh);
-
-            const shape = new CANNON.Box(new CANNON.Vec3(w / 2, h / 2, d / 2));
-            const body = new CANNON.Body({ mass: 0, material: physicsMaterial });
-            body.addShape(shape);
-            body.position.copy(mesh.position);
-            world.addBody(body);
-
-            if (isNeon) {
-                const pLight = new THREE.PointLight(colorHex, 1, 30);
-                pLight.position.set(x, y + h + 2, z);
-                scene.add(pLight);
-            }
-        }
-
-        function buildMap() {
-            const floorMat = new THREE.MeshStandardMaterial({ map: createCheckerboard(), roughness: 0.8 });
-            const floorMesh = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), floorMat);
-            floorMesh.rotation.x = -Math.PI / 2;
-            floorMesh.receiveShadow = true;
-            scene.add(floorMesh);
-            intersectableObjects.push(floorMesh);
-
-            const floorBody = new CANNON.Body({
-                mass: 0,
-                shape: new CANNON.Box(new CANNON.Vec3(200, 1, 200)),
-                material: physicsMaterial
-            });
-            floorBody.position.set(0, -1, 0);
-            world.addBody(floorBody);
-
-            addStaticBlock(0, 0, 0, 20, 2, 20, 0x333333);
-            addStaticBlock(0, 2, 0, 10, 8, 10, 0x00ffff, true);
-
-            let px = 20, py = 2, pz = 0;
-            const offsets = [-3, 4, -2, 5, -4, 3, -2, 1];
-            for (let i = 0; i < 8; i++) {
-                addStaticBlock(px, py, pz, 4, 1, 4, 0xff00ff, true);
-                px += 6; py += 2.5; pz += offsets[i];
-            }
-            addStaticBlock(px + 10, 0, pz, 15, py + 10, 15, 0x222244);
-            addStaticBlock(px + 10, py + 10, pz, 17, 2, 17, 0x00ffaa, true);
-
-            for (let i = 0; i < 15; i++) addStaticBlock(-20 - i * 2, i * 0.5, 20, 2, 0.5, 10, 0xff8800);
-        }
-        buildMap();
-
-        // --- Player Physics ---
-        const playerRadius = 0.8;
-        const playerMass = 5;
-        const playerBody = new CANNON.Body({
-            mass: playerMass,
-            material: physicsMaterial,
-            linearDamping: 0.0,
-            allowSleep: false
-        });
-        playerBody.addShape(new CANNON.Sphere(playerRadius));
-        playerBody.position.set(0, 15, 8);
-        playerBody.fixedRotation = true;
-        playerBody.updateMassProperties();
-        world.addBody(playerBody);
-
-        let jumpCooldown = 0;
-
-        function isBodyGrounded(targetBody) {
-            for (let i = 0; i < world.contacts.length; i++) {
-                const c = world.contacts[i];
-                if (c.bi.id === targetBody.id || c.bj.id === targetBody.id) {
-                    const upNormalY = (c.bi.id === targetBody.id) ? -c.ni.y : c.ni.y;
-                    if (upNormalY > 0.45) return true;
-                }
-            }
-            return false;
-        }
-
-        function tryJump() {
-            if (drivingCar || isShatteredLocal || jumpCooldown > 0) return;
-            if (isBodyGrounded(playerBody)) {
-                playerBody.velocity.y = 13;
-                jumpCooldown = 0.15;
-            }
-        }
-
-        // --- Car System (Enter, Drive, Exit, Multiplayer Sync) ---
-        const activeCars = {};
-        let drivingCar = null;
-
-        function createCarObject(id, data) {
-            if (activeCars[id]) return activeCars[id];
-
-            const color = data.color || '#ff0055';
-            const group = new THREE.Group();
-
-            const chassisMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.3, metalness: 0.6 });
-            const chassisMesh = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.9, 4.8), chassisMat);
-            chassisMesh.position.y = 0.75;
-            chassisMesh.castShadow = true;
-            chassisMesh.receiveShadow = true;
-            group.add(chassisMesh);
-
-            const cabinMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.1, metalness: 0.9 });
-            const cabinMesh = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.75, 2.4), cabinMat);
-            cabinMesh.position.set(0, 1.5, -0.2);
-            cabinMesh.castShadow = true;
-            group.add(cabinMesh);
-
-            const headlightMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
-            const taillightMat = new THREE.MeshBasicMaterial({ color: 0xff0044 });
-            const frontStrip = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.15, 0.1), headlightMat);
-            frontStrip.position.set(0, 0.8, -2.41);
-            group.add(frontStrip);
-
-            const rearStrip = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.15, 0.1), taillightMat);
-            rearStrip.position.set(0, 0.8, 2.41);
-            group.add(rearStrip);
-
-            const wheelGeo = new THREE.CylinderGeometry(0.55, 0.55, 0.45, 16);
-            wheelGeo.rotateZ(Math.PI / 2);
-            const wheelMat = new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.8 });
-            const rimMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
-
-            const wheels = [];
-            const wheelPositions = [
-                [-1.35, 0.55, -1.5],
-                [1.35, 0.55, -1.5],
-                [-1.35, 0.55, 1.5],
-                [1.35, 0.55, 1.5]
-            ];
-
-            wheelPositions.forEach((pos, idx) => {
-                const wheelPivot = new THREE.Object3D();
-                wheelPivot.position.set(pos[0], pos[1], pos[2]);
-                const wMesh = new THREE.Mesh(wheelGeo, wheelMat);
-                wMesh.castShadow = true;
-                const rim = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.6, 0.15), rimMat);
-                wMesh.add(rim);
-                wheelPivot.add(wMesh);
-                group.add(wheelPivot);
-                wheels.push({ pivot: wheelPivot, mesh: wMesh, isFront: idx < 2 });
-            });
-
-            chassisMesh.userData = { isCar: true, id: id };
-            intersectableObjects.push(chassisMesh);
-
-            scene.add(group);
-
-            const body = new CANNON.Body({
-                mass: 40,
-                material: physicsMaterial,
-                linearDamping: 0.15,
-                angularDamping: 0.6,
-                allowSleep: false
-            });
-            body.addShape(new CANNON.Box(new CANNON.Vec3(1.3, 0.65, 2.4)), new CANNON.Vec3(0, 0.65, 0));
-            body.position.set(data.x || 0, data.y || 3, data.z || 0);
-            if (data.qx !== undefined) {
-                body.quaternion.set(data.qx, data.qy, data.qz, data.qw);
-            }
-            world.addBody(body);
-
-            group.position.copy(body.position);
-            group.quaternion.copy(body.quaternion);
-
-            const car = {
-                id,
-                color,
-                group,
-                chassisMesh,
-                wheels,
-                body,
-                driverId: data.driverId || null,
-                steerAngle: 0,
-                wheelSpin: 0
-            };
-
-            activeCars[id] = car;
-            return car;
-        }
-
-        createCarObject('car_default_1', { x: 14, y: 4, z: 12, color: '#00f5d4' });
-        createCarObject('car_default_2', { x: -14, y: 4, z: 12, color: '#f72585' });
-
-        document.getElementById('spawnCarBtn').addEventListener('click', () => {
-            const dir = new THREE.Vector3();
-            camera.getWorldDirection(dir);
-            const basePos = drivingCar ? drivingCar.body.position : playerObj.position;
-            const pos = new THREE.Vector3(basePos.x, basePos.y, basePos.z).addScaledVector(dir, 7);
-            pos.y += 3;
-
-            const carData = {
-                type: "spawnCar",
-                id: 'car_' + Date.now() + '_' + Math.random().toString(36).substring(2, 5),
-                color: '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0'),
-                x: pos.x, y: pos.y, z: pos.z,
-                qx: 0, qy: 0, qz: 0, qw: 1,
-                driverId: null
-            };
-            createCarObject(carData.id, carData);
-            sendPacket(carData);
-        });
-
-        function findNearestAvailableCar() {
-            let bestCar = null;
-            let minDist = 5.5;
-            for (let id in activeCars) {
-                const car = activeCars[id];
-                if (car.driverId && car.driverId !== userId) continue;
-                const dist = playerObj.position.distanceTo(car.group.position);
-                if (dist < minDist) {
-                    minDist = dist;
-                    bestCar = car;
-                }
-            }
-            return bestCar;
-        }
-
-        function toggleEnterExitCar() {
-            if (!isPlaying || isShatteredLocal) return;
-
-            if (drivingCar) {
-                const car = drivingCar;
-                car.driverId = null;
-                drivingCar = null;
-
-                const exitOffset = new THREE.Vector3(-2.6, 1.8, 0);
-                exitOffset.applyQuaternion(car.group.quaternion);
-                playerBody.position.set(
-                    car.body.position.x + exitOffset.x,
-                    car.body.position.y + exitOffset.y,
-                    car.body.position.z + exitOffset.z
-                );
-                playerBody.velocity.set(0, 0, 0);
-                world.addBody(playerBody);
-
-                pitchObj.position.set(0, 1.2, 0);
-
-                sendCarState(car);
-                syncPlayerState();
-            } else {
-                const nearCar = findNearestAvailableCar();
-                if (!nearCar) return;
-
-                drivingCar = nearCar;
-                drivingCar.driverId = userId;
-
-                world.removeBody(playerBody);
-                pitchObj.position.set(0, 2.5, 2.2);
-
-                sendCarState(drivingCar);
-                syncPlayerState();
-            }
-        }
-
-        vehiclePrompt.addEventListener('click', toggleEnterExitCar);
-        document.getElementById('carBtnMobile').addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            toggleEnterExitCar();
-        }, { passive: false });
-
-        function sendCarState(car) {
-            sendPacket({
-                type: "carUpdate",
-                id: car.id,
-                color: car.color,
-                x: car.body.position.x,
-                y: car.body.position.y,
-                z: car.body.position.z,
-                vx: car.body.velocity.x,
-                vy: car.body.velocity.y,
-                vz: car.body.velocity.z,
-                qx: car.body.quaternion.x,
-                qy: car.body.quaternion.y,
-                qz: car.body.quaternion.z,
-                qw: car.body.quaternion.w,
-                steerAngle: car.steerAngle,
-                driverId: car.driverId || ""
-            });
-        }
-
-        // --- Smart WebSocket Networking (Auto WSS for Render / WS for Local) ---
-        let socket = null;
-        let isConnected = false;
-        let remotePlayers = {};
-        let lastSyncTime = 0;
-        const activeProps = {};
-
-        function formatWsUrl(rawInput) {
-            let addr = rawInput.trim();
-            if (!addr) addr = "beamx.onrender.com";
-
-            if (!addr.startsWith("ws://") && !addr.startsWith("wss://")) {
-                const isLocal = addr.startsWith("127.0.0.1") || addr.startsWith("localhost") || addr.startsWith("192.168.");
-                const protocol = (!isLocal && (window.location.protocol === "https:" || addr.includes(".onrender.com") || addr.includes(".glitch.me")))
-                    ? "wss://"
-                    : "ws://";
-                addr = protocol + addr;
-            }
-            return addr;
-        }
-
-        function connectToServer() {
-            const wsUrl = formatWsUrl(serverIpInput.value);
-            if (socket) socket.close();
-
-            authStatus.innerText = `Bağlanılıyor: ${wsUrl} (Render uykudaysa 30sn sürebilir)...`;
-            authStatus.className = "text-cyan-400 mb-6 font-mono text-sm animate-pulse text-center";
-
-            try {
-                socket = new WebSocket(wsUrl);
-            } catch (err) {
-                authStatus.innerText = "Geçersiz Sunucu Adresi.";
-                authStatus.className = "text-red-400 mb-6 font-mono text-sm text-center";
-                return;
-            }
-
-            socket.onopen = () => {
-                isConnected = true;
-                authStatus.innerText = `Bağlandı! (${wsUrl})`;
-                authStatus.className = "text-green-400 mb-6 font-mono text-sm text-center";
-
-                sendPacket({
-                    type: "join",
-                    id: userId,
-                    color: myColor,
-                    x: playerBody.position.x,
-                    y: playerBody.position.y,
-                    z: playerBody.position.z,
-                    yaw: yawObj.rotation.y
-                });
-            };
-
-            socket.onmessage = (event) => {
-                try {
-                    handleServerMessage(JSON.parse(event.data));
-                } catch (e) {}
-            };
-
-            socket.onerror = () => {
-                authStatus.innerText = `Çevrimdışı Mod Hazır (${wsUrl} adresine ulaşılamadı)`;
-                authStatus.className = "text-amber-400 mb-6 font-mono text-sm text-center";
-            };
-
-            socket.onclose = () => {
-                isConnected = false;
-                Object.keys(remotePlayers).forEach(removeRemotePlayer);
-            };
-        }
-
-        connectBtn.addEventListener('click', connectToServer);
-
-        function sendPacket(obj) {
-            if (socket && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify(obj));
-            }
-        }
-
-        function handleServerMessage(msg) {
-            if (!msg || !msg.type) return;
-
-            switch (msg.type) {
-                case "init":
-                    userId = msg.selfId || userId;
-                    if (Array.isArray(msg.players)) {
-                        msg.players.forEach(p => {
-                            if (p.id !== userId) updateOrCreateRemotePlayer(p);
-                        });
-                    }
-                    if (Array.isArray(msg.props)) {
-                        msg.props.forEach(prop => {
-                            if (!activeProps[prop.id]) spawnLocalPropVisual(prop.id, prop);
-                        });
-                    }
-                    if (Array.isArray(msg.cars)) {
-                        msg.cars.forEach(c => {
-                            const car = createCarObject(c.id, c);
-                            applyRemoteCarState(car, c);
-                        });
-                    }
-                    break;
-
-                case "playerUpdate":
-                    if (msg.id && msg.id !== userId) {
-                        updateOrCreateRemotePlayer(msg);
-                    }
-                    break;
-
-                case "playerLeave":
-                    removeRemotePlayer(msg.id);
-                    break;
-
-                case "playerHit":
-                    if (msg.targetId === userId) {
-                        if (drivingCar) toggleEnterExitCar();
-                        triggerLocalShatter();
-                    }
-                    break;
-
-                case "spawnProp":
-                    if (!activeProps[msg.id]) {
-                        spawnLocalPropVisual(msg.id, msg);
-                    }
-                    break;
-
-                case "impulseProp":
-                    const prop = activeProps[msg.id];
-                    if (prop) {
-                        prop.body.wakeUp();
-                        prop.body.applyImpulse(
-                            new CANNON.Vec3(msg.fx, msg.fy, msg.fz),
-                            new CANNON.Vec3(msg.px, msg.py, msg.pz)
-                        );
-                    }
-                    break;
-
-                case "spawnCar":
-                    createCarObject(msg.id, msg);
-                    break;
-
-                case "carUpdate":
-                    const car = createCarObject(msg.id, msg);
-                    if (drivingCar !== car) {
-                        applyRemoteCarState(car, msg);
-                    }
-                    break;
-
-                case "chat":
-                    appendChatMessage(msg.uid, msg.color, msg.text);
-                    break;
-            }
-        }
-
-        function applyRemoteCarState(car, data) {
-            car.driverId = (data.driverId && data.driverId !== "") ? data.driverId : null;
-            car.steerAngle = data.steerAngle || 0;
-            car.body.position.set(data.x, data.y, data.z);
-            if (data.vx !== undefined) {
-                car.body.velocity.set(data.vx, data.vy, data.vz);
-            }
-            if (data.qx !== undefined) {
-                car.body.quaternion.set(data.qx, data.qy, data.qz, data.qw);
-            }
-        }
-
-        function updateOrCreateRemotePlayer(data) {
-            if (!remotePlayers[data.id]) {
-                remotePlayers[data.id] = createRemotePlayer(data.id, data.color || '#ffffff');
-            }
-            const rp = remotePlayers[data.id];
-            if (data.color && data.color !== rp.baseColor) {
-                rp.baseColor = data.color;
-                rp.bodyMesh.material.color.set(data.color);
-                rp.headMesh.material.color.set(data.color);
-            }
-            rp.targetPos.set(data.x, data.y - playerRadius, data.z);
-            rp.targetRotY = data.yaw || 0;
-
-            if (data.isShattered && !rp.isShattered) triggerRemoteShatter(rp);
-            else if (!data.isShattered && rp.isShattered) recoverRemoteShatter(rp);
-        }
-
-        function removeRemotePlayer(id) {
-            for (let carId in activeCars) {
-                if (activeCars[carId].driverId === id) {
-                    activeCars[carId].driverId = null;
-                }
-            }
-            if (remotePlayers[id]) {
-                scene.remove(remotePlayers[id].group);
-                const index = intersectableObjects.indexOf(remotePlayers[id].hitMesh);
-                if (index > -1) intersectableObjects.splice(index, 1);
-                delete remotePlayers[id];
-            }
-        }
-
-        // --- Synced Physics Props ---
-        function spawnLocalPropVisual(id, data) {
-            let mesh, shape;
-            const mat = new THREE.MeshStandardMaterial({ color: data.color, roughness: 0.4 });
-
-            if (data.propType === 'box') {
-                mesh = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), mat);
-                shape = new CANNON.Box(new CANNON.Vec3(1, 1, 1));
-            } else {
-                mesh = new THREE.Mesh(new THREE.SphereGeometry(1.2, 16, 16), mat);
-                shape = new CANNON.Sphere(1.2);
-            }
-
-            mesh.castShadow = true; mesh.receiveShadow = true;
-            mesh.position.set(data.x, data.y, data.z);
-            scene.add(mesh);
-            intersectableObjects.push(mesh);
-            mesh.userData = { isProp: true, id: id };
-
-            const body = new CANNON.Body({ mass: 2, material: physicsMaterial, linearDamping: 0.1, angularDamping: 0.1 });
-            body.addShape(shape);
-            body.position.copy(mesh.position);
-            world.addBody(body);
-
-            activeProps[id] = { mesh, body };
-        }
-
-        document.getElementById('spawnBoxBtn').addEventListener('click', () => requestSpawnProp('box'));
-        document.getElementById('spawnBallBtn').addEventListener('click', () => requestSpawnProp('ball'));
-
-        function requestSpawnProp(propType) {
-            const dir = new THREE.Vector3();
-            camera.getWorldDirection(dir);
-            const pos = new THREE.Vector3().copy(playerObj.position).addScaledVector(dir, 5);
-            pos.y += 2;
-
-            const propData = {
-                type: "spawnProp",
-                id: 'p_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-                propType: propType,
-                color: '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0'),
-                x: pos.x, y: pos.y, z: pos.z
-            };
-
-            spawnLocalPropVisual(propData.id, propData);
-            sendPacket(propData);
-        }
-
-        function syncPlayerState() {
-            if (!isPlaying || !isConnected) return;
-            const now = Date.now();
-            if (now - lastSyncTime < 50) return;
-            lastSyncTime = now;
-
-            const pos = drivingCar ? drivingCar.body.position : playerBody.position;
-            sendPacket({
-                type: "playerUpdate",
-                id: userId,
-                x: pos.x,
-                y: pos.y + (drivingCar ? 1.0 : 0),
-                z: pos.z,
-                yaw: yawObj.rotation.y,
-                color: myColor,
-                isShattered: isShatteredLocal
-            });
-
-            if (drivingCar) {
-                sendCarState(drivingCar);
-            }
-        }
-
-        // --- Chat ---
-        function escapeHTML(str) {
-            return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag]));
-        }
-
-        function appendChatMessage(uid, color, text) {
-            const div = document.createElement('div');
-            div.className = 'chat-msg';
-            div.innerHTML = `<span style="color:${color}; font-weight:bold;">${escapeHTML(uid.substring(0, 6))}:</span> <span class="text-gray-200">${escapeHTML(text)}</span>`;
-            chatMessages.appendChild(div);
-            while (chatMessages.children.length > 25) {
-                chatMessages.removeChild(chatMessages.firstChild);
-            }
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-
-        function sendChat() {
-            const text = chatInput.value.trim();
-            if (!text) return;
-            if (isConnected) {
-                sendPacket({ type: "chat", uid: userId, color: myColor, text: text });
-            } else {
-                appendChatMessage(userId, myColor, text);
-            }
-            chatInput.value = '';
-        }
-        chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendChat(); });
-
-        // --- Raycast Shooting ---
-        const raycaster = new THREE.Raycaster();
-
-        function fireRaycast() {
-            if (!isPlaying || isShatteredLocal) return;
-
-            const flash = new THREE.PointLight(0xffff00, 2, 10);
-            flash.position.set(0, 0, -1);
-            pitchObj.add(flash);
-            setTimeout(() => pitchObj.remove(flash), 50);
-
-            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-            const hits = raycaster.intersectObjects(intersectableObjects, false);
-
-            if (hits.length > 0) {
-                const hit = hits[0];
-                const obj = hit.object;
-                createSpark(hit.point);
-
-                if (obj.userData.isProp) {
-                    const dir = new THREE.Vector3();
-                    camera.getWorldDirection(dir);
-                    const forceMag = 45;
-                    const impulsePacket = {
-                        type: "impulseProp",
-                        id: obj.userData.id,
-                        fx: dir.x * forceMag, fy: dir.y * forceMag, fz: dir.z * forceMag,
-                        px: hit.point.x, py: hit.point.y, pz: hit.point.z
-                    };
-
-                    if (!isConnected && activeProps[obj.userData.id]) {
-                        const prop = activeProps[obj.userData.id];
-                        prop.body.wakeUp();
-                        prop.body.applyImpulse(
-                            new CANNON.Vec3(impulsePacket.fx, impulsePacket.fy, impulsePacket.fz),
-                            new CANNON.Vec3(impulsePacket.px, impulsePacket.py, impulsePacket.pz)
-                        );
-                    } else {
-                        sendPacket(impulsePacket);
-                    }
-                } else if (obj.userData.isCar) {
-                    const car = activeCars[obj.userData.id];
-                    if (car) {
-                        const dir = new THREE.Vector3();
-                        camera.getWorldDirection(dir);
-                        car.body.applyImpulse(
-                            new CANNON.Vec3(dir.x * 120, dir.y * 120, dir.z * 120),
-                            new CANNON.Vec3(hit.point.x, hit.point.y, hit.point.z)
-                        );
-                        sendCarState(car);
-                    }
-                } else if (obj.userData.isPlayer) {
-                    sendPacket({
-                        type: "playerHit",
-                        targetId: obj.userData.playerId
-                    });
-                }
-            }
-        }
-
-        function createSpark(pos) {
-            const mat = new THREE.MeshBasicMaterial({ color: 0xffffaa });
-            const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), mat);
-            mesh.position.copy(pos);
-            scene.add(mesh);
-            setTimeout(() => scene.remove(mesh), 150);
-        }
-
-        // --- Entities & Shatter Mechanics ---
-        const shatterDebris = [];
-
-        function createRemotePlayer(id, colorHex) {
-            const group = new THREE.Group();
-            const mat = new THREE.MeshStandardMaterial({ color: colorHex });
-            const bodyMesh = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.6, 1.2), mat);
-            bodyMesh.position.y = 0.8; bodyMesh.castShadow = true; group.add(bodyMesh);
-            const headMesh = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.8), mat);
-            headMesh.position.y = 2.0; headMesh.castShadow = true; group.add(headMesh);
-            const glasses = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.2, 0.2), new THREE.MeshBasicMaterial({ color: 0x000000 }));
-            glasses.position.set(0, 2.0, -0.4); group.add(glasses);
-
-            scene.add(group);
-
-            const hitMesh = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.6, 1.4), new THREE.MeshBasicMaterial({ visible: false }));
-            hitMesh.position.y = 1.3;
-            group.add(hitMesh);
-            hitMesh.userData = { isPlayer: true, playerId: id };
-            intersectableObjects.push(hitMesh);
-
-            return { group, bodyMesh, headMesh, hitMesh, targetPos: new THREE.Vector3(0, 10, 0), targetRotY: 0, isShattered: false, baseColor: colorHex };
-        }
-
-        function spawnPhysicalShatter(position, colorHex) {
-            const mat = new THREE.MeshStandardMaterial({ color: colorHex });
-            const geo = new THREE.BoxGeometry(0.4, 0.4, 0.4);
-            const shape = new CANNON.Box(new CANNON.Vec3(0.2, 0.2, 0.2));
-
-            for (let i = 0; i < 15; i++) {
-                const mesh = new THREE.Mesh(geo, mat);
-                scene.add(mesh);
-                const body = new CANNON.Body({ mass: 0.5, material: physicsMaterial });
-                body.addShape(shape);
-                body.position.set(position.x + (Math.random() - 0.5), position.y + 1 + Math.random(), position.z + (Math.random() - 0.5));
-                body.velocity.set((Math.random() - 0.5) * 15, 5 + Math.random() * 10, (Math.random() - 0.5) * 15);
-                world.addBody(body);
-                mesh.position.copy(body.position);
-                shatterDebris.push({ mesh, body, life: 3.0 });
-            }
-        }
-
-        function triggerLocalShatter() {
-            if (!ragdollEnabled || isShatteredLocal || !isPlaying) return;
-            isShatteredLocal = true;
-
-            pitchObj.position.set(0, -0.3, 0);
-            spawnPhysicalShatter(playerObj.position, myColor);
-            world.removeBody(playerBody);
-            syncPlayerState();
-
-            setTimeout(() => {
-                isShatteredLocal = false;
-                playerBody.position.set(0, 15, 8);
-                playerBody.velocity.set(0, 0, 0);
-                world.addBody(playerBody);
-                yawObj.rotation.y = 0;
-                pitchObj.rotation.x = 0;
-                pitchObj.position.set(0, 1.2, 0);
-                syncPlayerState();
-            }, 3000);
-        }
-
-        function triggerRemoteShatter(rp) {
-            rp.isShattered = true; rp.group.visible = false; rp.hitMesh.visible = false;
-            spawnPhysicalShatter(rp.group.position, rp.baseColor);
-        }
-
-        function recoverRemoteShatter(rp) {
-            rp.isShattered = false; rp.group.visible = true; rp.hitMesh.visible = true;
-        }
-
-        // --- Input & Controls ---
-        const keys = { w: false, a: false, s: false, d: false, space: false };
-        let mouseLocked = false;
-
-        document.addEventListener('mousemove', (e) => {
-            if (mouseLocked && isPlaying && !isShatteredLocal) {
-                const ySign = invertY ? 1 : -1;
-                yawObj.rotation.y -= (e.movementX || 0) * 0.002 * lookSensitivity;
-                pitchObj.rotation.x += (e.movementY || 0) * 0.002 * lookSensitivity * ySign;
-                pitchObj.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitchObj.rotation.x));
-            }
-        });
-
-        document.addEventListener('mousedown', (e) => {
-            if (!isPlaying || isShatteredLocal || settingsModal.style.display === 'block' || e.target.closest('.ui-btn') || e.target.closest('#vehiclePrompt') || e.target.closest('#chatContainer') || e.target.closest('#mobileControls')) return;
-            if (!mouseLocked) document.body.requestPointerLock();
-            else if (e.button === 0) fireRaycast();
-        });
-
-        document.addEventListener('pointerlockchange', () => mouseLocked = document.pointerLockElement === document.body);
-
-        window.addEventListener('keydown', (e) => {
-            if (!isPlaying || isShatteredLocal) return;
-            if (e.key === 'Enter') {
-                if (document.activeElement === chatInput) {
-                    sendChat();
-                    chatInput.blur();
-                    if (window.innerWidth > 768 && settingsModal.style.display !== 'block') document.body.requestPointerLock();
-                } else {
-                    if (mouseLocked) document.exitPointerLock();
-                    chatInput.focus();
-                }
-                return;
-            }
-            if (document.activeElement === chatInput) return;
-
-            const k = e.key.toLowerCase();
-            if (k === 'e') {
-                toggleEnterExitCar();
-                return;
-            }
-            if (k === 'f') {
-                toggleFullscreen();
-                return;
-            }
-            if (keys.hasOwnProperty(k)) keys[k] = true;
-            if (e.code === 'Space') {
-                keys.space = true;
-                tryJump();
-            }
-        });
-
-        window.addEventListener('keyup', (e) => {
-            const k = e.key.toLowerCase();
-            if (keys.hasOwnProperty(k)) keys[k] = false;
-            if (e.code === 'Space') keys.space = false;
-        });
-
-        // Mobile Controls
-        let joyMove = { x: 0, y: 0 };
-        const leftZone = document.getElementById('joyLeft'), leftKnob = document.getElementById('knobLeft');
-        let leftTouchId = null, leftCenter = { x: 0, y: 0 };
-
-        leftZone.addEventListener('touchstart', (e) => {
-            if (leftTouchId !== null) return;
-            e.preventDefault();
-            const touch = e.changedTouches[0];
-            leftTouchId = touch.identifier;
-            const rect = leftZone.getBoundingClientRect();
-            leftCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-            updateJoystick(touch);
-        }, { passive: false });
-
-        leftZone.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            for (let t of e.changedTouches) if (t.identifier === leftTouchId) updateJoystick(t);
-        }, { passive: false });
-
-        const resetLeftJoy = (e) => {
-            for (let t of e.changedTouches) {
-                if (t.identifier === leftTouchId) {
-                    leftTouchId = null;
-                    leftKnob.style.transform = `translate(0px, 0px)`;
-                    joyMove = { x: 0, y: 0 };
-                }
-            }
-        };
-        leftZone.addEventListener('touchend', resetLeftJoy);
-        leftZone.addEventListener('touchcancel', resetLeftJoy);
-
-        function updateJoystick(t) {
-            let dx = t.clientX - leftCenter.x, dy = t.clientY - leftCenter.y;
-            const dist = Math.hypot(dx, dy), radius = 35;
-            if (dist > radius) { dx *= radius / dist; dy *= radius / dist; }
-            leftKnob.style.transform = `translate(${dx}px, ${dy}px)`;
-            joyMove.x = dx / radius; joyMove.y = dy / radius;
-        }
-
-        const rightTouchZone = document.getElementById('rightTouchZone');
-        let lookTouchId = null, lastLookX = 0, lastLookY = 0;
-
-        rightTouchZone.addEventListener('touchstart', (e) => {
-            if (!isPlaying || isShatteredLocal || settingsModal.style.display === 'block') return;
-            e.preventDefault();
-            for (let t of e.changedTouches) if (lookTouchId === null) {
-                lookTouchId = t.identifier; lastLookX = t.clientX; lastLookY = t.clientY; break;
-            }
-        }, { passive: false });
-
-        rightTouchZone.addEventListener('touchmove', (e) => {
-            if (!isPlaying || isShatteredLocal) return;
-            e.preventDefault();
-            const ySign = invertY ? 1 : -1;
-            for (let t of e.changedTouches) {
-                if (t.identifier === lookTouchId) {
-                    yawObj.rotation.y -= (t.clientX - lastLookX) * 0.005 * lookSensitivity;
-                    pitchObj.rotation.x += (t.clientY - lastLookY) * 0.005 * lookSensitivity * ySign;
-                    pitchObj.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitchObj.rotation.x));
-                    lastLookX = t.clientX; lastLookY = t.clientY;
-                }
-            }
-        }, { passive: false });
-
-        const endLook = (e) => { for (let t of e.changedTouches) if (t.identifier === lookTouchId) lookTouchId = null; };
-        rightTouchZone.addEventListener('touchend', endLook);
-        rightTouchZone.addEventListener('touchcancel', endLook);
-
-        document.getElementById('jumpBtnMobile').addEventListener('touchstart', (e) => { e.preventDefault(); tryJump(); }, { passive: false });
-        document.getElementById('shootBtnMobile').addEventListener('touchstart', (e) => { e.preventDefault(); if (!isShatteredLocal) fireRaycast(); }, { passive: false });
-
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-
-        // --- Game Loop & FPS Counter ---
-        const clock = new THREE.Clock();
-        let frameCount = 0;
-        let fpsTimer = 0;
-        const fpsCounterEl = document.getElementById('fpsCounter');
-
-        function animate() {
-            requestAnimationFrame(animate);
-            const rawDt = clock.getDelta();
-            const dt = Math.min(rawDt, 0.1);
-
-            frameCount++;
-            fpsTimer += rawDt;
-            if (fpsTimer >= 0.5) {
-                fpsCounterEl.innerText = Math.round(frameCount / fpsTimer) + ' FPS';
-                frameCount = 0;
-                fpsTimer = 0;
-            }
-
-            if (jumpCooldown > 0) jumpCooldown -= dt;
-
-            world.step(1 / 60, dt, 3);
-
-            if (isPlaying && !isShatteredLocal) {
-                let throttle = 0, steer = 0;
-                if (document.activeElement !== chatInput) {
-                    if (keys.w) throttle += 1;
-                    if (keys.s) throttle -= 1;
-                    if (keys.a) steer += 1;
-                    if (keys.d) steer -= 1;
-                }
-                if (joyMove.x !== 0 || joyMove.y !== 0) {
-                    throttle = -joyMove.y;
-                    steer = -joyMove.x;
-                }
-
-                if (drivingCar) {
-                    vehiclePrompt.classList.remove('hidden');
-                    vehiclePrompt.innerText = "Araç Sürülüyor — İnmek için [E] | Fren: Space";
-
-                    const carBody = drivingCar.body;
-
-                    const euler = new CANNON.Vec3();
-                    carBody.quaternion.toEuler(euler);
-                    carBody.quaternion.setFromEuler(euler.x * 0.85, euler.y, euler.z * 0.85);
-
-                    drivingCar.steerAngle = THREE.MathUtils.lerp(drivingCar.steerAngle, steer * 0.55, 10 * dt);
-
-                    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(drivingCar.group.quaternion);
-                    forward.y = 0;
-                    forward.normalize();
-
-                    const currentVel = new THREE.Vector3(carBody.velocity.x, 0, carBody.velocity.z);
-                    const forwardSpeed = currentVel.dot(forward);
-
-                    if (keys.space) {
-                        carBody.velocity.x *= 0.88;
-                        carBody.velocity.z *= 0.88;
-                    } else if (throttle !== 0) {
-                        const maxSpeed = throttle > 0 ? 32 : 16;
-                        const accel = 42 * dt * throttle;
-                        const targetSpeed = THREE.MathUtils.clamp(forwardSpeed + accel, -maxSpeed, maxSpeed);
-                        carBody.velocity.x = forward.x * targetSpeed;
-                        carBody.velocity.z = forward.z * targetSpeed;
-                    } else {
-                        carBody.velocity.x *= 0.97;
-                        carBody.velocity.z *= 0.97;
-                    }
-
-                    if (Math.abs(forwardSpeed) > 0.5) {
-                        const dirSign = forwardSpeed >= 0 ? 1 : -1;
-                        const turnRate = drivingCar.steerAngle * dirSign * Math.min(Math.abs(forwardSpeed) / 10, 1.8);
-                        carBody.angularVelocity.y = turnRate * 2.4;
-                    } else {
-                        carBody.angularVelocity.y *= 0.5;
-                    }
-
-                    playerObj.position.copy(carBody.position);
-                    syncPlayerState();
-                } else {
-                    if (keys.space) tryJump();
-
-                    if (playerBody.position.y < -30) {
-                        playerBody.position.set(0, 15, 8);
-                        playerBody.velocity.set(0, 0, 0);
-                    }
-
-                    const moveSpeed = 15;
-                    let mx = -steer, mz = -throttle;
-
-                    const moveVec = new THREE.Vector3(mx, 0, mz);
-                    if (moveVec.lengthSq() > 0) {
-                        moveVec.normalize().multiplyScalar(moveSpeed);
-                        moveVec.applyAxisAngle(new THREE.Vector3(0, 1, 0), yawObj.rotation.y);
-                    }
-
-                    playerBody.velocity.x = moveVec.x;
-                    playerBody.velocity.z = moveVec.z;
-
-                    playerObj.position.copy(playerBody.position);
-
-                    const nearCar = findNearestAvailableCar();
-                    if (nearCar) {
-                        vehiclePrompt.classList.remove('hidden');
-                        vehiclePrompt.innerText = "Arabaya Binmek için [E] Tuşuna Basın 🚗";
-                    } else {
-                        vehiclePrompt.classList.add('hidden');
-                    }
-
-                    syncPlayerState();
-                }
-            }
-
-            // Update All Cars Visuals & Wheels
-            for (let id in activeCars) {
-                const car = activeCars[id];
-                if (car.body.position.y < -30) {
-                    car.body.position.set(0, 10, 12);
-                    car.body.velocity.set(0, 0, 0);
-                }
-                car.group.position.copy(car.body.position);
-                car.group.quaternion.copy(car.body.quaternion);
-
-                const speedMag = Math.hypot(car.body.velocity.x, car.body.velocity.z);
-                car.wheelSpin += speedMag * dt * 0.8;
-
-                car.wheels.forEach(w => {
-                    w.pivot.rotation.y = w.isFront ? car.steerAngle : 0;
-                    w.mesh.rotation.x = -car.wheelSpin;
-                });
-            }
-
-            // Update Props Visuals
-            for (let id in activeProps) {
-                const p = activeProps[id];
-                p.mesh.position.copy(p.body.position);
-                p.mesh.quaternion.copy(p.body.quaternion);
-            }
-
-            // Update Remote Players
-            for (let id in remotePlayers) {
-                const rp = remotePlayers[id];
-                if (!rp.isShattered) {
-                    rp.group.position.lerp(rp.targetPos, 0.25);
-                    const diff = rp.targetRotY - rp.group.rotation.y;
-                    rp.group.rotation.y += Math.atan2(Math.sin(diff), Math.cos(diff)) * 0.25;
-                }
-            }
-
-            // Debris Cleanup
-            for (let i = shatterDebris.length - 1; i >= 0; i--) {
-                const c = shatterDebris[i];
-                c.mesh.position.copy(c.body.position);
-                c.mesh.quaternion.copy(c.body.quaternion);
-                c.life -= dt;
-                if (c.life <= 0) {
-                    c.mesh.scale.multiplyScalar(0.9);
-                    if (c.mesh.scale.x < 0.05) {
-                        scene.remove(c.mesh);
-                        world.removeBody(c.body);
-                        shatterDebris.splice(i, 1);
-                    }
-                }
-            }
-
-            renderer.render(scene, camera);
-        }
-
-        // --- Start Button ---
-        playBtn.addEventListener('click', () => {
-            if (!isConnected) {
-                connectToServer();
-            }
-            startScreen.classList.add('hidden');
-            crosshair.classList.remove('hidden');
-            isPlaying = true;
-            if (window.innerWidth > 768) document.body.requestPointerLock();
-        });
-
-        animate();
-    </script>
+  </div>
+  <p id="authStatus" class="text-gray-400 mb-6 font-mono text-sm text-center">Sunucu adresini girip Connect'e basın veya doğrudan başlatın</p>
+  <div class="flex flex-wrap gap-4 justify-center">
+    <button id="playBtn" class="px-10 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold rounded-full text-xl border-2 border-cyan-300">ENTER PLAYGROUND</button>
+    <button id="startFullscreenBtn" class="px-6 py-4 bg-gray-800 text-cyan-300 font-bold rounded-full text-lg border-2 border-cyan-500/40">⛶ Tam Ekran</button>
+  </div>
+  <p id="instructions" class="mt-8 text-gray-400 text-center max-w-lg bg-black/40 p-4 rounded-xl border border-gray-700 text-sm">
+    <strong class="text-white">Masaüstü:</strong> Fareyi kilitlemek için tıklayın. WASD: Hareket / Sürüş. Space: Zıpla / Fren.<br>
+    <strong class="text-cyan-400">[E]</strong> araca bin/in, <strong class="text-cyan-400">[R]</strong> arabayı düzelt, <strong class="text-cyan-400">[M]</strong> marble modu, <strong class="text-cyan-400">[F]</strong> tam ekran. Sol Tık: Ateş. Enter: Sohbet.
+  </p>
+</div>
+
+<div id="topBar" class="no-select">
+  <div class="flex gap-2 flex-wrap">
+    <button id="spawnBoxBtn" class="ui-btn text-xs">Spawn Box</button>
+    <button id="spawnBallBtn" class="ui-btn text-xs">Spawn Ball</button>
+    <button id="spawnCarBtn" class="ui-btn text-xs" style="border-color:#e879f9">Spawn Car 🚗</button>
+    <button id="marbleBtn" class="ui-btn text-xs" style="border-color:#facc15">Marble 🔮</button>
+  </div>
+  <div class="flex gap-2">
+    <button id="fullscreenBtn" class="ui-btn icon-btn">⛶</button>
+    <button id="settingsBtn" class="ui-btn icon-btn">⚙️</button>
+  </div>
+</div>
+<div id="vehiclePrompt" class="hidden no-select"></div>
+
+<div id="settingsModal" class="no-select">
+  <div class="modal-header"><span>⚙️ Oyun Ayarları</span><span id="fpsCounter" class="text-xs font-mono text-emerald-400">60 FPS</span></div>
+  <div class="setting-row flex items-center justify-between"><span class="text-sm font-semibold">Oyuncu Rengi</span><input type="color" id="playerColorPicker" class="w-10 h-8 rounded cursor-pointer bg-transparent"></div>
+  <div class="setting-row"><div class="setting-label"><span>Kamera Hassasiyeti</span><span id="sensVal">1.0x</span></div><input type="range" id="sensSlider" min="0.2" max="3" step="0.1" value="1" class="w-full accent-cyan-400"></div>
+  <div class="setting-row"><div class="setting-label"><span>Görüş Açısı (FOV)</span><span id="fovVal">75°</span></div><input type="range" id="fovSlider" min="60" max="110" step="1" value="75" class="w-full accent-cyan-400"></div>
+  <div class="setting-row"><div class="setting-label"><span>Yerçekimi (yerel: sen/araba)</span><span id="gravVal">-25</span></div><input type="range" id="gravSlider" min="5" max="50" step="1" value="25" class="w-full accent-fuchsia-400"></div>
+  <div class="setting-row"><div class="setting-label"><span>Sis Yoğunluğu</span><span id="fogVal">0.007</span></div><input type="range" id="fogSlider" min="0" max="0.03" step="0.002" value="0.007" class="w-full accent-cyan-400"></div>
+  <label class="flex items-center space-x-3 cursor-pointer mb-3 text-sm"><input type="checkbox" id="ragdollToggle" checked class="w-4 h-4"><span>Vurulunca Parçalanma</span></label>
+  <label class="flex items-center space-x-3 cursor-pointer mb-3 text-sm"><input type="checkbox" id="shadowsToggle" checked class="w-4 h-4"><span>Gölgeler</span></label>
+  <label class="flex items-center space-x-3 cursor-pointer mb-4 text-sm"><input type="checkbox" id="invertYToggle" class="w-4 h-4"><span>Dikey Eksen Ters</span></label>
+  <div class="grid grid-cols-2 gap-2 mb-3">
+    <button id="modalFullscreenBtn" class="py-2 bg-cyan-700 rounded font-bold text-xs">⛶ Tam Ekran</button>
+    <button id="respawnBtn" class="py-2 bg-amber-600 rounded font-bold text-xs">🔄 Yeniden Doğ</button>
+  </div>
+  <button id="closeSettingsBtn" class="w-full py-2 bg-gray-700 rounded font-bold text-sm">Kapat</button>
+</div>
+
+<div id="chatContainer" class="no-select">
+  <div id="chatMessages"></div>
+  <input type="text" id="chatInput" placeholder="Sohbet için Enter'a basın..." autocomplete="off" maxlength="100">
+</div>
+<div id="crosshair" class="hidden"></div>
+<div id="mobileControls" class="no-select">
+  <div id="rightTouchZone"></div>
+  <div id="joyLeft" class="joystick-zone"><div id="knobLeft" class="joystick-knob"></div></div>
+  <div id="jumpBtnMobile" class="action-btn">JUMP</div>
+  <div id="shootBtnMobile" class="action-btn">FIRE</div>
+  <div id="carBtnMobile" class="action-btn">CAR</div>
+</div>
+
+<script>
+// ================= State =================
+let isPlaying = false, isShatteredLocal = false, ragdollEnabled = true, lookSensitivity = 1, invertY = false;
+let userId = 'u_' + Math.random().toString(36).substring(2, 9);
+const isHex = (s) => typeof s === 'string' && /^#[0-9a-f]{6}$/i.test(s);
+const randHex = () => '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
+let myColor = randHex();
+const $ = (id) => document.getElementById(id);
+const startScreen = $('startScreen'), serverIpInput = $('serverIpInput'), authStatus = $('authStatus');
+const crosshair = $('crosshair'), chatInput = $('chatInput'), chatMessages = $('chatMessages');
+const settingsModal = $('settingsModal'), vehiclePrompt = $('vehiclePrompt');
+$('playerColorPicker').value = myColor;
+
+function toggleFullscreen() {
+  const d = document.documentElement, fs = document.fullscreenElement || document.webkitFullscreenElement;
+  if (!fs) (d.requestFullscreen || d.webkitRequestFullscreen || (() => {})).call(d);
+  else (document.exitFullscreen || document.webkitExitFullscreen || (() => {})).call(document);
+}
+['fullscreenBtn', 'startFullscreenBtn', 'modalFullscreenBtn'].forEach((i) => $(i).addEventListener('click', toggleFullscreen));
+
+// ================= Physics (client: oyuncu, araç, parçalar) =================
+const world = new CANNON.World();
+world.gravity.set(0, -25, 0);
+world.broadphase = new CANNON.SAPBroadphase(world);
+world.solver.iterations = 15;
+const pm = new CANNON.Material('std');
+const pcm = new CANNON.ContactMaterial(pm, pm, { friction: 0, restitution: 0, contactEquationStiffness: 1e8, contactEquationRelaxation: 3 });
+world.addContactMaterial(pcm);
+world.defaultContactMaterial = pcm;
+
+// ================= Graphics =================
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x050014);
+scene.fog = new THREE.FogExp2(0x050014, 0.007);
+const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 1000);
+const playerObj = new THREE.Object3D(), yawObj = new THREE.Object3D(), pitchObj = new THREE.Object3D();
+scene.add(playerObj); playerObj.add(yawObj); yawObj.add(pitchObj); pitchObj.add(camera);
+pitchObj.position.y = 1.2;
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.insertBefore(renderer.domElement, document.body.firstChild);
+scene.add(new THREE.AmbientLight(0x404060, 0.6));
+const moonLight = new THREE.DirectionalLight(0x55aaff, 0.8);
+moonLight.position.set(50, 100, -50);
+moonLight.castShadow = true;
+Object.assign(moonLight.shadow.camera, { left: -120, right: 120, top: 120, bottom: -120 });
+moonLight.shadow.mapSize.set(2048, 2048);
+scene.add(moonLight); scene.add(moonLight.target);
+// Sadece 3 ışık (eskiden ~20 PointLight vardı)
+[[0, 14, 0, 0x00ffff], [60, 24, 10, 0xff00ff], [90, 50, 0, 0x00ffaa], [-90, 12, -60, 0x8b5cf6], [160, 22, 0, 0xf97316]].forEach(([x, y, z, c]) => {
+  const l = new THREE.PointLight(c, 1.2, 60); l.position.set(x, y, z); scene.add(l);
+});
+const flashLight = new THREE.PointLight(0xffff00, 0, 10); // tek, yeniden kullanılan namlu ışığı
+flashLight.position.set(0, 0, -1); pitchObj.add(flashLight);
+
+// ================= Settings =================
+$('settingsBtn').addEventListener('click', () => {
+  settingsModal.style.display = settingsModal.style.display === 'block' ? 'none' : 'block';
+  if (settingsModal.style.display === 'block' && document.pointerLockElement) document.exitPointerLock();
+});
+$('closeSettingsBtn').addEventListener('click', () => (settingsModal.style.display = 'none'));
+$('playerColorPicker').addEventListener('input', (e) => { myColor = e.target.value; setLocalMarbleColor(); syncPlayerState(true); });
+$('sensSlider').addEventListener('input', (e) => { lookSensitivity = +e.target.value; $('sensVal').innerText = lookSensitivity.toFixed(1) + 'x'; });
+$('fovSlider').addEventListener('input', (e) => { camera.fov = +e.target.value; camera.updateProjectionMatrix(); $('fovVal').innerText = e.target.value + '°'; });
+$('gravSlider').addEventListener('input', (e) => { world.gravity.set(0, -e.target.value, 0); $('gravVal').innerText = '-' + e.target.value; });
+$('fogSlider').addEventListener('input', (e) => { scene.fog.density = +e.target.value; $('fogVal').innerText = e.target.value; });
+$('ragdollToggle').addEventListener('change', (e) => (ragdollEnabled = e.target.checked));
+$('shadowsToggle').addEventListener('change', (e) => {
+  renderer.shadowMap.enabled = e.target.checked; moonLight.castShadow = e.target.checked;
+  scene.traverse((o) => { if (o.material) o.material.needsUpdate = true; });
+});
+$('invertYToggle').addEventListener('change', (e) => (invertY = e.target.checked));
+$('respawnBtn').addEventListener('click', () => {
+  if (drivingCar) exitCar();
+  playerBody.position.set(0, 15, 8); playerBody.velocity.set(0, 0, 0); playerBody.angularVelocity.set(0, 0, 0);
+  settingsModal.style.display = 'none';
+});
+
+// ================= Map (server.js ile birebir aynı) =================
+const intersectableObjects = [];
+function createCheckerboard() {
+  const c = document.createElement('canvas'); c.width = c.height = 512;
+  const x = c.getContext('2d');
+  x.fillStyle = '#0a0a1a'; x.fillRect(0, 0, 512, 512); x.fillStyle = '#1a1a3a';
+  for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) if ((i + j) % 2 === 0) x.fillRect(i * 64, j * 64, 64, 64);
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(37, 37);
+  return t;
+}
+function addStaticBlock(x, y, z, w, h, d, color, neon = false, rot = [0, 0, 0]) {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({
+    color, roughness: neon ? 0.2 : 0.7, emissive: neon ? color : 0, emissiveIntensity: neon ? 0.6 : 0 }));
+  mesh.position.set(x, y + h / 2, z);
+  mesh.rotation.set(rot[0], rot[1], rot[2]);
+  mesh.castShadow = mesh.receiveShadow = true;
+  scene.add(mesh); intersectableObjects.push(mesh);
+  const body = new CANNON.Body({ mass: 0, material: pm });
+  body.addShape(new CANNON.Box(new CANNON.Vec3(w / 2, h / 2, d / 2)));
+  body.position.copy(mesh.position);
+  body.quaternion.setFromEuler(rot[0], rot[1], rot[2], 'XYZ');
+  world.addBody(body);
+}
+// ---- HARİTA VERİSİ: index.html ve server.js'de BİREBİR AYNI olmalı ----
+// [x, y(alt), z, w, h, d, renk, neon, [rx,ry,rz]]
+function mapBlocks() {
+  const B = [];
+  // Merkez + neon kule + parkur merdiveni + turuncu rampa
+  B.push([0, 0, 0, 20, 2, 20, 0x333333, false]);
+  B.push([0, 2, 0, 10, 8, 10, 0x00ffff, true]);
+  let px = 20, py = 2, pz = 0;
+  const off = [-3, 4, -2, 5, -4, 3, -2, 1];
+  for (let i = 0; i < 8; i++) { B.push([px, py, pz, 4, 1, 4, 0xff00ff, true]); px += 6; py += 2.5; pz += off[i]; }
+  B.push([px + 10, 0, pz, 15, py + 10, 15, 0x222244, false]);
+  B.push([px + 10, py + 10, pz, 17, 2, 17, 0x00ffaa, true]);
+  for (let i = 0; i < 15; i++) B.push([-20 - i * 2, i * 0.5, 20, 2, 0.5, 10, 0xff8800, false]);
+
+  // 1) Atlama rampaları + iniş platformu (güney, -z)
+  [-18, 0, 18].forEach((x) => B.push([x, 1.5, -40, 10, 1, 16, 0xffcc00, true, [0.3, 0, 0]]));
+  B.push([0, 0, -75, 60, 3, 24, 0x0f766e, false]);
+  B.push([0, 3, -84, 20, 1, 6, 0x14b8a6, true]);
+
+  // 2) Marble çanağı (batı-güney): düz taban + 4 eğimli duvar
+  const cx = -90, cz = -60;
+  B.push([cx, 0, cz, 20, 1, 20, 0x6d28d9, false]);
+  B.push([cx, 3.9, cz - 16.1, 28, 1, 14, 0x8b5cf6, false, [0.5, 0, 0]]);
+  B.push([cx, 3.9, cz + 16.1, 28, 1, 14, 0x8b5cf6, false, [-0.5, 0, 0]]);
+  B.push([cx + 16.1, 3.9, cz, 14, 1, 28, 0xa78bfa, false, [0, 0, 0.5]]);
+  B.push([cx - 16.1, 3.9, cz, 14, 1, 28, 0xa78bfa, false, [0, 0, -0.5]]);
+  B.push([cx, 1, cz, 3, 2, 3, 0xfacc15, true]);
+
+  // 3) Uçan adalar (kuzey, -z): zıplayarak tırman
+  for (let i = 0; i < 12; i++) B.push([Math.sin(i * 0.6) * 12, 2 + i * 3, -110 - i * 9, 6, 1, 6, 0xf472b6, true]);
+  B.push([0, 38, -228, 16, 2, 16, 0xfacc15, true]);
+
+  // 4) Gökdelenler + merdiven + köprü (+z)
+  B.push([-30, 0, 110, 12, 30, 12, 0x1e293b, false]);
+  B.push([-5, 0, 110, 12, 30, 12, 0x1e293b, false]);
+  B.push([20, 0, 110, 16, 30, 16, 0x1e293b, false]);
+  B.push([-17.5, 29, 110, 13, 1, 4, 0x38bdf8, true]);
+  B.push([7, 29, 110, 12, 1, 4, 0x38bdf8, true]);
+  B.push([20, 30, 110, 16, 1, 16, 0x22d3ee, true]);
+  B.push([-30, 30, 110, 12, 1, 12, 0x22d3ee, true]);
+  for (let i = 0; i < 12; i++) B.push([-30, 0, 101.5 - 5 * (11 - i), 8, 2.5 * (i + 1), 5, 0x334155, false]);
+  B.push([-55, 0, 130, 10, 14, 10, 0x0f172a, false]);
+  B.push([45, 0, 135, 12, 22, 12, 0x0f172a, false]);
+  B.push([10, 0, 145, 10, 10, 10, 0x0f172a, true]);
+
+  // 5) Sütun ormanı (doğu, +x)
+  for (let i = 0; i < 6; i++) for (let j = 0; j < 6; j++) {
+    const h = 2 + ((i * 3 + j * 5) % 7) * 1.5;
+    B.push([130 + i * 14, 0, -35 + j * 14, 6, h, 6, h > 8 ? 0xf97316 : 0x475569, h > 8]);
+  }
+
+  // 6) Yarış pisti (batı, +z): dış duvar + iç ada
+  const tx = -130, tz = 100;
+  B.push([tx, 0, tz - 45, 140, 3, 2, 0xef4444, true]);
+  B.push([tx, 0, tz + 45, 140, 3, 2, 0xef4444, true]);
+  B.push([tx - 70, 0, tz, 2, 3, 90, 0xef4444, true]);
+  B.push([tx + 70, 0, tz, 2, 3, 90, 0xef4444, true]);
+  B.push([tx, 0, tz, 90, 3, 40, 0x1f2937, false]);
+  B.push([tx, 3, tz, 10, 0.5, 10, 0xfacc15, true]);
+
+  // 7) Harita sınırı duvarları
+  B.push([0, 0, -300, 600, 20, 4, 0x111827, false]);
+  B.push([0, 0, 300, 600, 20, 4, 0x111827, false]);
+  B.push([-300, 0, 0, 4, 20, 600, 0x111827, false]);
+  B.push([300, 0, 0, 4, 20, 600, 0x111827, false]);
+  return B;
+}
+(function buildMap() {
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), new THREE.MeshStandardMaterial({ map: createCheckerboard(), roughness: 0.8 }));
+  floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true;
+  scene.add(floor); intersectableObjects.push(floor);
+  const fb = new CANNON.Body({ mass: 0, material: pm });
+  fb.addShape(new CANNON.Box(new CANNON.Vec3(300, 1, 300)));
+  fb.position.set(0, -1, 0); world.addBody(fb);
+  mapBlocks().forEach((b) => addStaticBlock(b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8]));
+})();
+
+// ================= Player =================
+const playerRadius = 0.8;
+const playerBody = new CANNON.Body({ mass: 5, material: pm, allowSleep: false });
+playerBody.addShape(new CANNON.Sphere(playerRadius));
+playerBody.position.set(0, 15, 8);
+playerBody.fixedRotation = true; playerBody.updateMassProperties();
+world.addBody(playerBody);
+let jumpCooldown = 0;
+
+function isBodyGrounded(b) {
+  for (const c of world.contacts) {
+    if (c.bi.id === b.id || c.bj.id === b.id) {
+      const up = c.bi.id === b.id ? -c.ni.y : c.ni.y;
+      if (up > 0.45) return true;
+    }
+  }
+  return false;
+}
+function tryJump() {
+  if (drivingCar || isShatteredLocal || jumpCooldown > 0) return;
+  if (isBodyGrounded(playerBody)) { playerBody.velocity.y = 13; jumpCooldown = 0.15; }
+}
+
+// ================= Marble modu =================
+let marbleMode = false;
+const marbleMat = new CANNON.Material('marble');
+world.addContactMaterial(new CANNON.ContactMaterial(marbleMat, pm, { friction: 0.8, restitution: 0.25, contactEquationStiffness: 1e8, contactEquationRelaxation: 3 }));
+const marbleGeo = new THREE.SphereGeometry(playerRadius, 32, 24);
+function makeMarbleMat(color) { // dönüşü görebilmen için bantlı/benekli doku
+  const c = document.createElement('canvas'); c.width = 256; c.height = 128;
+  const x = c.getContext('2d');
+  x.fillStyle = color; x.fillRect(0, 0, 256, 128);
+  x.strokeStyle = 'rgba(255,255,255,.85)'; x.lineWidth = 10;
+  for (let i = 0; i < 4; i++) {
+    x.beginPath(); x.moveTo(0, 16 + i * 32);
+    for (let u = 0; u <= 256; u += 16) x.lineTo(u, 16 + i * 32 + Math.sin(u / 256 * 12.56 + i) * 14);
+    x.stroke();
+  }
+  x.fillStyle = 'rgba(0,0,0,.35)';
+  for (let i = 0; i < 10; i++) { x.beginPath(); x.arc(Math.random() * 256, Math.random() * 128, 6 + Math.random() * 8, 0, 7); x.fill(); }
+  return new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(c), roughness: 0.12, metalness: 0.35 });
+}
+const marbleMesh = new THREE.Mesh(marbleGeo, makeMarbleMat(myColor));
+marbleMesh.castShadow = true; marbleMesh.visible = false; scene.add(marbleMesh);
+const marbleDir = { x: 0, z: 0 };
+function setLocalMarbleColor() { marbleMesh.material.map.dispose(); marbleMesh.material.dispose(); marbleMesh.material = makeMarbleMat(myColor); }
+function applyCameraRig() {
+  if (marbleMode) { camera.position.set(0, 1.5, 7); pitchObj.position.set(0, 0.3, 0); }
+  else { camera.position.set(0, 0, 0); pitchObj.position.set(0, 1.2, 0); }
+}
+function setMarble(on) {
+  if (on === marbleMode) return;
+  marbleMode = on;
+  const b = playerBody;
+  b.fixedRotation = !on; b.material = on ? marbleMat : pm;
+  b.angularDamping = on ? 0.3 : 0.01; b.linearDamping = on ? 0.05 : 0.01;
+  b.updateMassProperties();
+  b.angularVelocity.set(0, 0, 0); if (!on) b.quaternion.set(0, 0, 0, 1);
+  pitchObj.rotation.x = on ? -0.3 : 0;
+  applyCameraRig();
+  $('marbleBtn').style.background = on ? 'rgba(250,204,21,.35)' : '';
+  syncPlayerState(true);
+}
+function toggleMarble() { if (!isPlaying || drivingCar || isShatteredLocal) return; setMarble(!marbleMode); }
+$('marbleBtn').addEventListener('click', toggleMarble);
+// Gerçek yuvarlanma: topa tork uygulanır, hareketi zemin sürtünmesi yaratır
+world.addEventListener('preStep', () => {
+  if (!marbleMode || !playerBody.world || (marbleDir.x === 0 && marbleDir.z === 0)) return;
+  const av = playerBody.angularVelocity;
+  if (Math.hypot(av.x, av.z) > 38) return; // maksimum hız
+  playerBody.torque.x += marbleDir.z * 45;
+  playerBody.torque.z -= marbleDir.x * 45;
+});
+
+// ================= Cars (gerçek RaycastVehicle) =================
+const activeCars = {};
+let drivingCar = null;
+const CAR_Y = 1.15; // yerden gövde merkezine yükseklik
+const tmpQ = new THREE.Quaternion(), tmpQ2 = new THREE.Quaternion();
+
+function createCarObject(id, data) {
+  if (activeCars[id]) return activeCars[id];
+  const color = isHex(data.color) ? data.color : '#ff0055';
+  const group = new THREE.Group(), model = new THREE.Group();
+  model.position.y = -1.1; group.add(model);
+  const chassisMesh = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.9, 4.8), new THREE.MeshStandardMaterial({ color, roughness: 0.3, metalness: 0.6 }));
+  chassisMesh.position.y = 0.75; chassisMesh.castShadow = true; model.add(chassisMesh);
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.75, 2.4), new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.1, metalness: 0.9 }));
+  cabin.position.set(0, 1.5, -0.2); cabin.castShadow = true; model.add(cabin);
+  const hl = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.15, 0.1), new THREE.MeshBasicMaterial({ color: 0x00ffff })); hl.position.set(0, 0.8, -2.41); model.add(hl);
+  const tl = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.15, 0.1), new THREE.MeshBasicMaterial({ color: 0xff0044 })); tl.position.set(0, 0.8, 2.41); model.add(tl);
+  const wheelGeo = new THREE.CylinderGeometry(0.55, 0.55, 0.45, 16); wheelGeo.rotateZ(Math.PI / 2);
+  const wheelMat = new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.8 });
+  const rimGeo = new THREE.BoxGeometry(0.48, 0.6, 0.15), rimMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
+  const wheels = [];
+  [[-1.35, 0.55, -1.5], [1.35, 0.55, -1.5], [-1.35, 0.55, 1.5], [1.35, 0.55, 1.5]].forEach((p, i) => {
+    const pivot = new THREE.Object3D(); pivot.position.set(...p);
+    const m = new THREE.Mesh(wheelGeo, wheelMat); m.castShadow = true; m.add(new THREE.Mesh(rimGeo, rimMat));
+    pivot.add(m); model.add(pivot); wheels.push({ pivot, mesh: m, isFront: i < 2 });
+  });
+  chassisMesh.userData = { isCar: true, id };
+  intersectableObjects.push(chassisMesh);
+  scene.add(group);
+
+  const body = new CANNON.Body({ mass: 0, type: CANNON.Body.KINEMATIC, material: pm, allowSleep: false });
+  body.addShape(new CANNON.Box(new CANNON.Vec3(1.3, 0.65, 2.4)));
+  body.position.set(data.x ?? 0, data.y ?? CAR_Y, data.z ?? 0);
+  if (data.qx !== undefined) body.quaternion.set(data.qx, data.qy, data.qz, data.qw);
+  world.addBody(body);
+  const car = {
+    id, color, group, chassisMesh, wheels, body, vehicle: null, driverId: null, steer: 0, wheelSpin: 0,
+    tp: new THREE.Vector3().copy(body.position), tq: new THREE.Quaternion(body.quaternion.x, body.quaternion.y, body.quaternion.z, body.quaternion.w),
+    prev: new THREE.Vector3().copy(body.position)
+  };
+  group.position.copy(body.position); group.quaternion.copy(body.quaternion);
+  activeCars[id] = car;
+  return car;
+}
+
+function makeVehicle(car) {
+  const v = new CANNON.RaycastVehicle({ chassisBody: car.body, indexRightAxis: 0, indexUpAxis: 1, indexForwardAxis: 2 });
+  const o = {
+    radius: 0.55, directionLocal: new CANNON.Vec3(0, -1, 0), axleLocal: new CANNON.Vec3(-1, 0, 0),
+    suspensionStiffness: 35, suspensionRestLength: 0.35, maxSuspensionTravel: 0.3, maxSuspensionForce: 100000,
+    frictionSlip: 3, dampingRelaxation: 2.3, dampingCompression: 4.4, rollInfluence: 0.01,
+    customSlidingRotationalSpeed: -30, useCustomSlidingRotationalSpeed: true, chassisConnectionPointLocal: new CANNON.Vec3()
+  };
+  [[-1.35, -0.3, -1.5], [1.35, -0.3, -1.5], [-1.35, -0.3, 1.5], [1.35, -0.3, 1.5]].forEach((p) => { o.chassisConnectionPointLocal.set(...p); v.addWheel(o); });
+  v.addToWorld(world);
+  return v;
+}
+
+function groundY(x, y, z) {
+  const hits = new THREE.Raycaster(new THREE.Vector3(x, y + 50, z), new THREE.Vector3(0, -1, 0))
+    .intersectObjects(intersectableObjects, false).filter((h) => !h.object.userData.isProp && !h.object.userData.isCar && !h.object.userData.isPlayer);
+  return hits.length ? hits[0].point.y : 0;
+}
+
+createCarObject('car_default_1', { x: 14, y: CAR_Y, z: 12, color: '#00f5d4' });
+createCarObject('car_default_2', { x: -14, y: CAR_Y, z: 12, color: '#f72585' });
+
+$('spawnCarBtn').addEventListener('click', () => {
+  const dir = new THREE.Vector3(); camera.getWorldDirection(dir); dir.y = 0; dir.normalize();
+  const b = drivingCar ? drivingCar.body.position : playerBody.position;
+  const x = b.x + dir.x * 8, z = b.z + dir.z * 8;
+  const data = { type: 'spawnCar', id: 'car_' + Date.now() + '_' + Math.random().toString(36).substring(2, 5), color: randHex(),
+    x, y: groundY(x, b.y, z) + CAR_Y, z, qx: 0, qy: 0, qz: 0, qw: 1, driverId: '' };
+  createCarObject(data.id, data);
+  sendPacket(data);
+});
+
+function findNearestAvailableCar() {
+  let best = null, min = 6;
+  for (const id in activeCars) {
+    const c = activeCars[id];
+    if (c.driverId && c.driverId !== userId) continue;
+    const d = playerBody.position.distanceTo(c.body.position);
+    if (d < min) { min = d; best = c; }
+  }
+  return best;
+}
+
+function enterCar(car) {
+  if (marbleMode) setMarble(false);
+  car.driverId = userId; drivingCar = car;
+  world.removeBody(playerBody);
+  const b = car.body;
+  b.type = CANNON.Body.DYNAMIC; b.mass = 150; b.updateMassProperties();
+  b.velocity.set(0, 0, 0); b.angularVelocity.set(0, 0, 0);
+  car.vehicle = makeVehicle(car);
+  pitchObj.position.set(0, 2.5, 2.2);
+  sendCarState(car); syncPlayerState(true);
+}
+function exitCar() {
+  const car = drivingCar; if (!car) return;
+  car.vehicle.removeFromWorld(world); car.vehicle = null;
+  world.addBody(car.body);
+  const b = car.body;
+  b.type = CANNON.Body.KINEMATIC; b.mass = 0; b.updateMassProperties();
+  b.velocity.set(0, 0, 0); b.angularVelocity.set(0, 0, 0);
+  car.tp.copy(b.position); car.tq.set(b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w);
+  car.driverId = null; drivingCar = null;
+  const off = new THREE.Vector3(-2.8, -0.2, 0).applyQuaternion(car.tq);
+  playerBody.position.set(b.position.x + off.x, b.position.y + off.y, b.position.z + off.z);
+  playerBody.velocity.set(0, 0, 0);
+  world.addBody(playerBody);
+  pitchObj.position.set(0, 1.2, 0);
+  sendCarState(car); syncPlayerState(true);
+}
+function toggleEnterExitCar() {
+  if (!isPlaying || isShatteredLocal) return;
+  if (drivingCar) exitCar();
+  else { const c = findNearestAvailableCar(); if (c) enterCar(c); }
+}
+vehiclePrompt.addEventListener('click', toggleEnterExitCar);
+$('carBtnMobile').addEventListener('touchstart', (e) => { e.preventDefault(); toggleEnterExitCar(); }, { passive: false });
+
+function sendCarState(car) {
+  const b = car.body;
+  sendPacket({ type: 'carUpdate', id: car.id, color: car.color, x: b.position.x, y: b.position.y, z: b.position.z,
+    qx: b.quaternion.x, qy: b.quaternion.y, qz: b.quaternion.z, qw: b.quaternion.w, steerAngle: car.steer, driverId: car.driverId || '' });
+}
+function applyRemoteCarState(car, d) {
+  car.driverId = d.driverId ? d.driverId : null;
+  car.steer = d.steerAngle || 0;
+  car.tp.set(d.x, d.y, d.z);
+  if (d.qx !== undefined) car.tq.set(d.qx, d.qy, d.qz, d.qw);
+}
+
+// ================= Networking =================
+let socket = null, isConnected = false, lastSyncTime = 0;
+const remotePlayers = {}, activeProps = {};
+
+function formatWsUrl(raw) {
+  let a = raw.trim() || 'beamx.onrender.com';
+  if (!/^wss?:\/\//.test(a)) {
+    const local = /^(127\.0\.0\.1|localhost|192\.168\.)/.test(a);
+    a = (!local && (location.protocol === 'https:' || a.includes('.onrender.com')) ? 'wss://' : 'ws://') + a;
+  }
+  return a;
+}
+function setStatus(t, cls) { authStatus.innerText = t; authStatus.className = cls + ' mb-6 font-mono text-sm text-center'; }
+
+function connectToServer() {
+  const url = formatWsUrl(serverIpInput.value);
+  if (socket) { socket.onclose = null; socket.close(); }
+  setStatus(`Bağlanılıyor: ${url} (Render uykudaysa 30sn sürebilir)...`, 'text-cyan-400 animate-pulse');
+  try { socket = new WebSocket(url); } catch (e) { setStatus('Geçersiz Sunucu Adresi.', 'text-red-400'); return; }
+  socket.onopen = () => {
+    isConnected = true; setStatus(`Bağlandı! (${url})`, 'text-green-400');
+    sendPacket({ type: 'join', id: userId, color: myColor, x: playerBody.position.x, y: playerBody.position.y, z: playerBody.position.z, yaw: yawObj.rotation.y });
+  };
+  socket.onmessage = (e) => { try { handleServerMessage(JSON.parse(e.data)); } catch (err) { console.error(err); } };
+  socket.onerror = () => setStatus(`Çevrimdışı Mod (${url} adresine ulaşılamadı) — proplar sunucu gerektirir`, 'text-amber-400');
+  socket.onclose = () => {
+    isConnected = false;
+    Object.keys(remotePlayers).forEach(removeRemotePlayer);
+    Object.keys(activeProps).forEach(removeProp);
+  };
+}
+$('connectBtn').addEventListener('click', connectToServer);
+function sendPacket(o) { if (socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(o)); }
+
+function handleServerMessage(msg) {
+  if (!msg || !msg.type) return;
+  switch (msg.type) {
+    case 'init':
+      userId = msg.selfId || userId;
+      (msg.players || []).forEach((p) => p.id !== userId && updateOrCreateRemotePlayer(p));
+      (msg.props || []).forEach((p) => !activeProps[p.id] && spawnPropVisual(p.id, p));
+      (msg.cars || []).forEach((c) => { const car = createCarObject(c.id, c); if (drivingCar !== car) applyRemoteCarState(car, c); });
+      break;
+    case 'playerUpdate': if (msg.id !== userId) updateOrCreateRemotePlayer(msg); break;
+    case 'playerLeave': removeRemotePlayer(msg.id); break;
+    case 'playerHit': if (msg.targetId === userId) { if (drivingCar) exitCar(); triggerLocalShatter(); } break;
+    case 'spawnProp': if (!activeProps[msg.id]) spawnPropVisual(msg.id, msg); break;
+    case 'removeProp': removeProp(msg.id); break;
+    case 'propsState':
+      for (const a of msg.p) {
+        const p = activeProps[a[0]]; if (!p) continue;
+        p.tp.set(a[1], a[2], a[3]); p.tq.set(a[4], a[5], a[6], a[7]);
+      }
+      break;
+    case 'carUpdate': {
+      const car = createCarObject(msg.id, msg);
+      if (drivingCar === car) { if (msg.driverId && msg.driverId !== userId) exitCar(); break; }
+      applyRemoteCarState(car, msg);
+      break;
+    }
+    case 'chat': appendChatMessage(msg.uid, msg.color, msg.text); break;
+  }
+}
+
+function updateOrCreateRemotePlayer(d) {
+  if (!remotePlayers[d.id]) remotePlayers[d.id] = createRemotePlayer(d.id, isHex(d.color) ? d.color : '#ffffff');
+  const rp = remotePlayers[d.id];
+  if (isHex(d.color) && d.color !== rp.baseColor) { rp.baseColor = d.color; rp.mat.color.set(d.color); rp.marbleMesh.material.map.dispose(); rp.marbleMesh.material.dispose(); rp.marbleMesh.material = makeMarbleMat(d.color); }
+  rp.targetPos.set(d.x, d.y - playerRadius, d.z);
+  rp.targetRotY = d.yaw || 0;
+  if (d.isShattered && !rp.isShattered) triggerRemoteShatter(rp);
+  else if (!d.isShattered && rp.isShattered) { rp.isShattered = false; }
+  const m = !!d.marble;
+  if (d.mq) rp.mq.set(d.mq[0], d.mq[1], d.mq[2], d.mq[3]);
+  rp.parts.forEach((p) => (p.visible = !m));
+  rp.hitMesh.scale.y = m ? 0.6 : 1; rp.hitMesh.position.y = m ? 0.8 : 1.3;
+  const vis = !rp.isShattered && !d.driving;
+  rp.group.visible = rp.hitMesh.visible = vis; rp.marbleMesh.visible = vis && m;
+}
+function removeRemotePlayer(id) {
+  const rp = remotePlayers[id]; if (!rp) return;
+  for (const cid in activeCars) if (activeCars[cid].driverId === id) activeCars[cid].driverId = null;
+  scene.remove(rp.group); scene.remove(rp.marbleMesh); rp.marbleMesh.material.map.dispose(); rp.marbleMesh.material.dispose();
+  const i = intersectableObjects.indexOf(rp.hitMesh); if (i > -1) intersectableObjects.splice(i, 1);
+  rp.group.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+  delete remotePlayers[id];
+}
+
+// ================= Props (sunucu otoriteli) =================
+const boxGeo = new THREE.BoxGeometry(2, 2, 2), ballGeo = new THREE.SphereGeometry(1.2, 16, 16);
+function spawnPropVisual(id, d) {
+  const mesh = new THREE.Mesh(d.propType === 'box' ? boxGeo : ballGeo, new THREE.MeshStandardMaterial({ color: isHex(d.color) ? d.color : '#fff', roughness: 0.4 }));
+  mesh.castShadow = mesh.receiveShadow = true;
+  mesh.position.set(d.x, d.y, d.z);
+  if (d.qx !== undefined) mesh.quaternion.set(d.qx, d.qy, d.qz, d.qw);
+  mesh.userData = { isProp: true, id };
+  scene.add(mesh); intersectableObjects.push(mesh);
+  let body = null;
+  if (!isConnected) { // çevrimdışı yedek: yerel fizik
+    body = new CANNON.Body({ mass: 2, material: pm, linearDamping: 0.1, angularDamping: 0.2 });
+    body.addShape(d.propType === 'box' ? new CANNON.Box(new CANNON.Vec3(1, 1, 1)) : new CANNON.Sphere(1.2));
+    body.position.set(d.x, d.y, d.z); world.addBody(body);
+  }
+  activeProps[id] = { mesh, body, tp: mesh.position.clone(), tq: mesh.quaternion.clone() };
+}
+function removeProp(id) {
+  const p = activeProps[id]; if (!p) return;
+  scene.remove(p.mesh); p.mesh.material.dispose();
+  const i = intersectableObjects.indexOf(p.mesh); if (i > -1) intersectableObjects.splice(i, 1);
+  if (p.body) world.removeBody(p.body);
+  delete activeProps[id];
+}
+function requestSpawnProp(propType) {
+  const dir = new THREE.Vector3(); camera.getWorldDirection(dir);
+  const base = drivingCar ? drivingCar.body.position : playerBody.position;
+  const pos = new THREE.Vector3(base.x, base.y, base.z).addScaledVector(dir, 5); pos.y += 2;
+  const data = { type: 'spawnProp', id: 'p_' + Date.now(), propType, color: randHex(), x: pos.x, y: pos.y, z: pos.z };
+  if (isConnected) sendPacket(data); else spawnPropVisual(data.id, data);
+}
+$('spawnBoxBtn').addEventListener('click', () => requestSpawnProp('box'));
+$('spawnBallBtn').addEventListener('click', () => requestSpawnProp('ball'));
+
+function syncPlayerState(force) {
+  if (!isPlaying || !isConnected) return;
+  const now = Date.now();
+  if (!force && now - lastSyncTime < 50) return;
+  lastSyncTime = now;
+  const pos = drivingCar ? drivingCar.body.position : playerBody.position;
+  sendPacket({ type: 'playerUpdate', id: userId, x: pos.x, y: pos.y, z: pos.z, yaw: yawObj.rotation.y, color: myColor, isShattered: isShatteredLocal, driving: !!drivingCar, marble: marbleMode, mq: [playerBody.quaternion.x, playerBody.quaternion.y, playerBody.quaternion.z, playerBody.quaternion.w] });
+  if (drivingCar) sendCarState(drivingCar);
+}
+
+// ================= Chat =================
+const escapeHTML = (s) => String(s).replace(/[&<>'"]/g, (t) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[t]));
+function appendChatMessage(uid, color, text) {
+  const div = document.createElement('div'); div.className = 'chat-msg';
+  div.innerHTML = `<span style="color:${isHex(color) ? color : '#fff'};font-weight:bold">${escapeHTML(String(uid).substring(0, 6))}:</span> <span class="text-gray-200">${escapeHTML(text)}</span>`;
+  chatMessages.appendChild(div);
+  while (chatMessages.children.length > 25) chatMessages.removeChild(chatMessages.firstChild);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+function sendChat() {
+  const text = chatInput.value.trim(); if (!text) return;
+  if (isConnected) sendPacket({ type: 'chat', text }); else appendChatMessage(userId, myColor, text);
+  chatInput.value = '';
+}
+chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendChat(); });
+
+// ================= Shooting =================
+const raycaster = new THREE.Raycaster();
+const sparkGeo = new THREE.BoxGeometry(0.2, 0.2, 0.2), sparkMat = new THREE.MeshBasicMaterial({ color: 0xffffaa });
+function createSpark(pos) {
+  const m = new THREE.Mesh(sparkGeo, sparkMat); m.position.copy(pos); scene.add(m);
+  setTimeout(() => scene.remove(m), 150);
+}
+function fireRaycast() {
+  if (!isPlaying || isShatteredLocal) return;
+  flashLight.intensity = 2; setTimeout(() => (flashLight.intensity = 0), 50);
+  raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+  const hits = raycaster.intersectObjects(intersectableObjects, false);
+  if (!hits.length) return;
+  const { object: obj, point } = hits[0];
+  createSpark(point);
+  if (obj.userData.isProp) {
+    const dir = new THREE.Vector3(); camera.getWorldDirection(dir);
+    const f = 45, pk = { type: 'impulseProp', id: obj.userData.id, fx: dir.x * f, fy: dir.y * f, fz: dir.z * f, px: point.x, py: point.y, pz: point.z };
+    const p = activeProps[obj.userData.id];
+    if (!isConnected && p && p.body) {
+      p.body.wakeUp();
+      p.body.applyImpulse(new CANNON.Vec3(pk.fx, pk.fy, pk.fz), new CANNON.Vec3(point.x - p.body.position.x, point.y - p.body.position.y, point.z - p.body.position.z));
+    } else sendPacket(pk);
+  } else if (obj.userData.isPlayer) sendPacket({ type: 'playerHit', targetId: obj.userData.playerId });
+}
+
+// ================= Remote players & shatter =================
+const shatterDebris = [];
+const debrisGeo = new THREE.BoxGeometry(0.4, 0.4, 0.4), debrisShape = new CANNON.Box(new CANNON.Vec3(0.2, 0.2, 0.2));
+function createRemotePlayer(id, colorHex) {
+  const group = new THREE.Group(), mat = new THREE.MeshStandardMaterial({ color: colorHex });
+  const b = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.6, 1.2), mat); b.position.y = 0.8; b.castShadow = true; group.add(b);
+  const h = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.8), mat); h.position.y = 2; h.castShadow = true; group.add(h);
+  const g = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.2, 0.2), new THREE.MeshBasicMaterial({ color: 0 })); g.position.set(0, 2, -0.4); group.add(g);
+  const hitMesh = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.6, 1.4), new THREE.MeshBasicMaterial({ visible: false }));
+  hitMesh.position.y = 1.3; hitMesh.userData = { isPlayer: true, playerId: id }; group.add(hitMesh);
+  scene.add(group); intersectableObjects.push(hitMesh);
+  const marbleM = new THREE.Mesh(marbleGeo, makeMarbleMat(colorHex)); marbleM.castShadow = true; marbleM.visible = false; scene.add(marbleM);
+  return { group, mat, hitMesh, parts: [b, h, g], marbleMesh: marbleM, mq: new THREE.Quaternion(), targetPos: new THREE.Vector3(0, 10, 0), targetRotY: 0, isShattered: false, baseColor: colorHex };
+}
+function spawnPhysicalShatter(pos, colorHex) {
+  const batch = { mat: new THREE.MeshStandardMaterial({ color: colorHex }), n: 15 };
+  for (let i = 0; i < 15; i++) {
+    const mesh = new THREE.Mesh(debrisGeo, batch.mat); scene.add(mesh);
+    const body = new CANNON.Body({ mass: 0.5, material: pm });
+    body.addShape(debrisShape);
+    body.position.set(pos.x + Math.random() - 0.5, pos.y + 1 + Math.random(), pos.z + Math.random() - 0.5);
+    body.velocity.set((Math.random() - 0.5) * 15, 5 + Math.random() * 10, (Math.random() - 0.5) * 15);
+    world.addBody(body);
+    shatterDebris.push({ mesh, body, life: 3, batch });
+  }
+}
+function triggerLocalShatter() {
+  if (!ragdollEnabled || isShatteredLocal || !isPlaying) return;
+  isShatteredLocal = true;
+  pitchObj.position.set(0, -0.3, 0);
+  spawnPhysicalShatter(playerBody.position, myColor);
+  world.removeBody(playerBody);
+  syncPlayerState(true);
+  setTimeout(() => {
+    isShatteredLocal = false;
+    playerBody.position.set(0, 15, 8); playerBody.velocity.set(0, 0, 0);
+    world.addBody(playerBody);
+    yawObj.rotation.y = 0; pitchObj.rotation.x = marbleMode ? -0.3 : 0; applyCameraRig(); playerBody.angularVelocity.set(0, 0, 0);
+    syncPlayerState(true);
+  }, 3000);
+}
+function triggerRemoteShatter(rp) {
+  rp.isShattered = true; rp.group.visible = rp.hitMesh.visible = false;
+  spawnPhysicalShatter(rp.group.position, rp.baseColor);
+}
+
+// ================= Input =================
+const keys = { w: false, a: false, s: false, d: false, space: false };
+let mouseLocked = false;
+document.addEventListener('mousemove', (e) => {
+  if (!mouseLocked || !isPlaying || isShatteredLocal) return;
+  yawObj.rotation.y -= (e.movementX || 0) * 0.002 * lookSensitivity;
+  pitchObj.rotation.x += (e.movementY || 0) * 0.002 * lookSensitivity * (invertY ? 1 : -1);
+  pitchObj.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitchObj.rotation.x));
+});
+document.addEventListener('mousedown', (e) => {
+  if (!isPlaying || isShatteredLocal || settingsModal.style.display === 'block' || e.target.closest('.ui-btn,#vehiclePrompt,#chatContainer,#mobileControls')) return;
+  if (!mouseLocked) document.body.requestPointerLock(); else if (e.button === 0) fireRaycast();
+});
+document.addEventListener('pointerlockchange', () => (mouseLocked = document.pointerLockElement === document.body));
+
+addEventListener('keydown', (e) => {
+  if (!isPlaying) return;
+  if (e.key === 'Enter') {
+    if (document.activeElement === chatInput) { sendChat(); chatInput.blur(); if (innerWidth > 768 && settingsModal.style.display !== 'block') document.body.requestPointerLock(); }
+    else { if (mouseLocked) document.exitPointerLock(); chatInput.focus(); }
+    return;
+  }
+  if (document.activeElement === chatInput) return;
+  const k = e.key.toLowerCase();
+  if (k === 'e') return toggleEnterExitCar();
+  if (k === 'f') return toggleFullscreen();
+  if (k === 'r' && drivingCar) return flipCar(drivingCar);
+  if (k === 'm') return toggleMarble();
+  if (k in keys) keys[k] = true;
+  if (e.code === 'Space') { keys.space = true; tryJump(); }
+});
+addEventListener('keyup', (e) => {
+  const k = e.key.toLowerCase();
+  if (k in keys) keys[k] = false;
+  if (e.code === 'Space') keys.space = false;
+});
+function flipCar(car) {
+  const b = car.body, e = new THREE.Euler().setFromQuaternion(new THREE.Quaternion(b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w), 'YXZ');
+  b.quaternion.setFromEuler(0, e.y, 0, 'XYZ'); b.position.y += 2;
+  b.velocity.set(0, 0, 0); b.angularVelocity.set(0, 0, 0);
+}
+
+// Mobile
+let joyMove = { x: 0, y: 0 };
+const leftZone = $('joyLeft'), leftKnob = $('knobLeft');
+let leftTouchId = null, leftCenter = { x: 0, y: 0 };
+function updateJoystick(t) {
+  let dx = t.clientX - leftCenter.x, dy = t.clientY - leftCenter.y;
+  const dist = Math.hypot(dx, dy), r = 35;
+  if (dist > r) { dx *= r / dist; dy *= r / dist; }
+  leftKnob.style.transform = `translate(${dx}px,${dy}px)`;
+  joyMove.x = dx / r; joyMove.y = dy / r;
+}
+leftZone.addEventListener('touchstart', (e) => {
+  if (leftTouchId !== null) return; e.preventDefault();
+  const t = e.changedTouches[0]; leftTouchId = t.identifier;
+  const r = leftZone.getBoundingClientRect(); leftCenter = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  updateJoystick(t);
+}, { passive: false });
+leftZone.addEventListener('touchmove', (e) => { e.preventDefault(); for (const t of e.changedTouches) if (t.identifier === leftTouchId) updateJoystick(t); }, { passive: false });
+const resetJoy = (e) => { for (const t of e.changedTouches) if (t.identifier === leftTouchId) { leftTouchId = null; leftKnob.style.transform = ''; joyMove = { x: 0, y: 0 }; } };
+leftZone.addEventListener('touchend', resetJoy); leftZone.addEventListener('touchcancel', resetJoy);
+
+const rz = $('rightTouchZone');
+let lookId = null, lastX = 0, lastY = 0;
+rz.addEventListener('touchstart', (e) => {
+  if (!isPlaying || isShatteredLocal || settingsModal.style.display === 'block') return; e.preventDefault();
+  for (const t of e.changedTouches) if (lookId === null) { lookId = t.identifier; lastX = t.clientX; lastY = t.clientY; break; }
+}, { passive: false });
+rz.addEventListener('touchmove', (e) => {
+  if (!isPlaying || isShatteredLocal) return; e.preventDefault();
+  for (const t of e.changedTouches) if (t.identifier === lookId) {
+    yawObj.rotation.y -= (t.clientX - lastX) * 0.005 * lookSensitivity;
+    pitchObj.rotation.x += (t.clientY - lastY) * 0.005 * lookSensitivity * (invertY ? 1 : -1);
+    pitchObj.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitchObj.rotation.x));
+    lastX = t.clientX; lastY = t.clientY;
+  }
+}, { passive: false });
+const endLook = (e) => { for (const t of e.changedTouches) if (t.identifier === lookId) lookId = null; };
+rz.addEventListener('touchend', endLook); rz.addEventListener('touchcancel', endLook);
+$('jumpBtnMobile').addEventListener('touchstart', (e) => { e.preventDefault(); tryJump(); }, { passive: false });
+$('shootBtnMobile').addEventListener('touchstart', (e) => { e.preventDefault(); fireRaycast(); }, { passive: false });
+
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+
+// ================= Game loop =================
+const clock = new THREE.Clock();
+let frames = 0, fpsTimer = 0;
+const fwdV = new THREE.Vector3(), tmpV = new THREE.Vector3();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const raw = clock.getDelta(), dt = Math.min(raw, 0.05);
+  frames++; fpsTimer += raw;
+  if (fpsTimer >= 0.5) { $('fpsCounter').innerText = Math.round(frames / fpsTimer) + ' FPS'; frames = 0; fpsTimer = 0; }
+  if (jumpCooldown > 0) jumpCooldown -= dt;
+
+  // Uzak araçları kinematik olarak hedefe yumuşat (dinamik olmayanlar)
+  for (const id in activeCars) {
+    const c = activeCars[id];
+    if (c === drivingCar) continue;
+    const b = c.body;
+    b.position.x += (c.tp.x - b.position.x) * 0.3; b.position.y += (c.tp.y - b.position.y) * 0.3; b.position.z += (c.tp.z - b.position.z) * 0.3;
+    tmpQ.set(b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w).slerp(c.tq, 0.3);
+    b.quaternion.set(tmpQ.x, tmpQ.y, tmpQ.z, tmpQ.w);
+  }
+
+  // Sürüş girdileri (fizik adımından ÖNCE)
+  let throttle = 0, steer = 0;
+  if (isPlaying && !isShatteredLocal) {
+    if (document.activeElement !== chatInput) {
+      if (keys.w) throttle++; if (keys.s) throttle--; if (keys.a) steer++; if (keys.d) steer--;
+    }
+    if (joyMove.x !== 0 || joyMove.y !== 0) { throttle = -joyMove.y; steer = -joyMove.x; }
+    if (drivingCar) {
+      const c = drivingCar, v = c.vehicle, spd = c.body.velocity.length();
+      const f = (throttle > 0 && spd > 38) ? 0 : -throttle * 900;
+      v.applyEngineForce(f, 2); v.applyEngineForce(f, 3);
+      const brake = keys.space ? 40 : (throttle === 0 ? 4 : 0);
+      for (let i = 0; i < 4; i++) v.setBrake(brake, i);
+      c.steer += (steer * 0.5 - c.steer) * Math.min(1, 8 * dt);
+      v.setSteeringValue(c.steer, 0); v.setSteeringValue(c.steer, 1);
+    }
+  }
+
+  world.step(1 / 60, dt, 3);
+
+  if (isPlaying && !isShatteredLocal) {
+    if (drivingCar) {
+      vehiclePrompt.classList.remove('hidden');
+      vehiclePrompt.innerText = 'Sürüş — İn: [E] | Fren: Space | Düzelt: [R]';
+      playerObj.position.copy(drivingCar.body.position);
+      syncPlayerState();
+    } else {
+      if (keys.space) tryJump();
+      if (playerBody.position.y < -30) { playerBody.position.set(0, 15, 8); playerBody.velocity.set(0, 0, 0); }
+      if (playerBody.velocity.y < -45) playerBody.velocity.y = -45; // tünelleme önleme
+      const mv = new THREE.Vector3(-steer, 0, -throttle);
+      if (mv.lengthSq() > 0) { mv.normalize(); mv.applyAxisAngle(new THREE.Vector3(0, 1, 0), yawObj.rotation.y); }
+      if (marbleMode) { marbleDir.x = mv.x; marbleDir.z = mv.z; }
+      else { marbleDir.x = marbleDir.z = 0; mv.multiplyScalar(15); playerBody.velocity.x = mv.x; playerBody.velocity.z = mv.z; }
+      playerObj.position.copy(playerBody.position);
+      if (findNearestAvailableCar()) { vehiclePrompt.classList.remove('hidden'); vehiclePrompt.innerText = 'Arabaya Binmek için [E] 🚗'; }
+      else if (marbleMode) { vehiclePrompt.classList.remove('hidden'); vehiclePrompt.innerText = '🔮 Marble — Çık: [M] | Zıpla: Space'; }
+      else vehiclePrompt.classList.add('hidden');
+      syncPlayerState();
+    }
+  }
+
+  marbleMesh.visible = marbleMode && !isShatteredLocal && !drivingCar;
+  marbleMesh.position.copy(playerBody.position); marbleMesh.quaternion.copy(playerBody.quaternion);
+
+  // Araç görselleri
+  for (const id in activeCars) {
+    const c = activeCars[id];
+    if (c.body.position.y < -30) { c.body.position.set(0, 5, 12); c.body.velocity.set(0, 0, 0); c.tp.set(0, 5, 12); }
+    c.group.position.copy(c.body.position); c.group.quaternion.copy(c.body.quaternion);
+    fwdV.set(0, 0, -1).applyQuaternion(c.group.quaternion);
+    tmpV.copy(c.group.position).sub(c.prev);
+    c.wheelSpin += tmpV.dot(fwdV) / 0.55;
+    c.prev.copy(c.group.position);
+    c.wheels.forEach((w) => { w.pivot.rotation.y = w.isFront ? c.steer : 0; w.mesh.rotation.x = -c.wheelSpin; });
+  }
+
+  // Proplar: sunucu snapshot'ına interpolasyon (çevrimdışıysa yerel fizik)
+  for (const id in activeProps) {
+    const p = activeProps[id];
+    if (p.body) { p.mesh.position.copy(p.body.position); p.mesh.quaternion.copy(p.body.quaternion); }
+    else { p.mesh.position.lerp(p.tp, 0.35); p.mesh.quaternion.slerp(p.tq, 0.35); }
+  }
+
+  for (const id in remotePlayers) {
+    const rp = remotePlayers[id];
+    if (rp.isShattered) continue;
+    rp.group.position.lerp(rp.targetPos, 0.25);
+    const diff = rp.targetRotY - rp.group.rotation.y;
+    rp.group.rotation.y += Math.atan2(Math.sin(diff), Math.cos(diff)) * 0.25;
+    rp.marbleMesh.position.set(rp.group.position.x, rp.group.position.y + playerRadius, rp.group.position.z);
+    rp.marbleMesh.quaternion.slerp(rp.mq, 0.3);
+  }
+
+  for (let i = shatterDebris.length - 1; i >= 0; i--) {
+    const c = shatterDebris[i];
+    c.mesh.position.copy(c.body.position); c.mesh.quaternion.copy(c.body.quaternion);
+    c.life -= dt;
+    if (c.life <= 0) {
+      c.mesh.scale.multiplyScalar(0.9);
+      if (c.mesh.scale.x < 0.05) {
+        scene.remove(c.mesh); world.removeBody(c.body); shatterDebris.splice(i, 1);
+        if (--c.batch.n === 0) c.batch.mat.dispose();
+      }
+    }
+  }
+  moonLight.position.set(playerObj.position.x + 50, 100, playerObj.position.z - 50);
+  moonLight.target.position.set(playerObj.position.x, 0, playerObj.position.z);
+  moonLight.target.updateMatrixWorld();
+  renderer.render(scene, camera);
+}
+
+$('playBtn').addEventListener('click', () => {
+  if (!isConnected) connectToServer();
+  startScreen.classList.add('hidden');
+  crosshair.classList.remove('hidden');
+  isPlaying = true;
+  if (innerWidth > 768) document.body.requestPointerLock();
+});
+animate();
+</script>
 </body>
 </html>
