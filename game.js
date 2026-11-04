@@ -1,256 +1,258 @@
-let scene, camera, renderer;
-let car, player;
-let isInCar = false;
-let canEnterCar = false;
-const obstacles = [];
+const http = require('http');
+const crypto = require('crypto');
 
-const pState = { pos: new THREE.Vector3(5, 1, 5), angle: 0, speed: 0.15 };
-const cState = { pos: new THREE.Vector3(0, 0.5, 0), angle: 0, speed: 0, maxSpeed: 1.2, accel: 0.02, friction: 0.97 };
-const keys = { up: false, down: false, left: false, right: false, action: false };
+const PORT = 7777;
+const WS_MAGIC_STRING = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 
-function init() {
-    scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x5ca2e8);
-    scene.fog = new THREE.FogExp2(0x5ca2e8, 0.003);
+const clients = new Set();
+const playerStates = new Map(); // playerId -> playerObj
+const carStates = new Map();    // carId -> carObj
+const spawnedProps = [];        // array of propObjs (max 100)
 
-    camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+const server = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('3D Physics Sandbox TCP WebSocket Server Running on Port ' + PORT);
+});
 
-    // Maksimum Grafik Ayarları (PBR & Soft Shadows)
-    renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.1;
-    document.getElementById('canvas-container').appendChild(renderer.domElement);
+server.on('upgrade', (req, socket) => {
+    const key = req.headers['sec-websocket-key'];
+    if (!key) {
+        socket.destroy();
+        return;
+    }
 
-    // Işıklandırma
-    const ambient = new THREE.AmbientLight(0xffffff, 0.5);
-    scene.add(ambient);
-    
-    const sun = new THREE.DirectionalLight(0xfff5e6, 1.8);
-    sun.position.set(100, 150, 50);
-    sun.castShadow = true;
-    sun.shadow.mapSize.width = 2048;
-    sun.shadow.mapSize.height = 2048;
-    sun.shadow.camera.near = 0.5;
-    sun.shadow.camera.far = 300;
-    const d = 80;
-    sun.shadow.camera.left = -d;
-    sun.shadow.camera.right = d;
-    sun.shadow.camera.top = d;
-    sun.shadow.camera.bottom = -d;
-    scene.add(sun);
+    const acceptKey = crypto
+        .createHash('sha1')
+        .update(key + WS_MAGIC_STRING)
+        .digest('base64');
 
-    buildWorld();
-    setupEntities();
-    setupInput();
+    const headers = [
+        'HTTP/1.1 101 Switching Protocols',
+        'Upgrade: websocket',
+        'Connection: Upgrade',
+        `Sec-WebSocket-Accept: ${acceptKey}`,
+        '\r\n'
+    ];
 
-    window.addEventListener('resize', onWindowResize);
-    animate();
-}
+    socket.write(headers.join('\r\n'));
+    socket.setNoDelay(true); // Disable Nagle's algorithm for low-latency TCP
 
-function buildWorld() {
-    // Asfalt Zemin
-    const floorGeo = new THREE.PlaneGeometry(500, 500);
-    const floorMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.7, metalness: 0.2 });
-    const floor = new THREE.Mesh(floorGeo, floorMat);
-    floor.rotation.x = -Math.PI / 2;
-    floor.receiveShadow = true;
-    scene.add(floor);
+    const client = {
+        socket,
+        playerId: null,
+        buffer: Buffer.alloc(0)
+    };
+    clients.add(client);
 
-    // Çarpışılabilir Binalar/Kutular
-    for(let i=0; i<40; i++) {
-        const w = 4 + Math.random() * 8;
-        const h = 5 + Math.random() * 20;
-        const d = 4 + Math.random() * 8;
-        const mat = new THREE.MeshStandardMaterial({ color: Math.random() * 0xffffff, roughness: 0.3, metalness: 0.6 });
-        const building = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), mat);
-        building.scale.set(w, h, d);
-        
-        let bx = (Math.random() - 0.5) * 300;
-        let bz = (Math.random() - 0.5) * 300;
-        
-        // Araç doğma noktasını temiz bırak
-        if(Math.abs(bx) < 15 && Math.abs(bz) < 15) bx += 20;
+    socket.on('data', (chunk) => {
+        client.buffer = Buffer.concat([client.buffer, chunk]);
+        processBuffer(client);
+    });
 
-        building.position.set(bx, h/2, bz);
-        building.castShadow = true;
-        building.receiveShadow = true;
-        scene.add(building);
-        
-        // Fizik Kutusu Ekle
-        obstacles.push(new THREE.Box3().setFromObject(building));
+    socket.on('close', () => handleDisconnect(client));
+    socket.on('error', () => handleDisconnect(client));
+});
+
+function processBuffer(client) {
+    while (client.buffer.length >= 2) {
+        const firstByte = client.buffer[0];
+        const secondByte = client.buffer[1];
+
+        const opcode = firstByte & 0x0f;
+        const isMasked = (secondByte & 0x80) !== 0;
+        let payloadLen = secondByte & 0x7f;
+        let offset = 2;
+
+        if (payloadLen === 126) {
+            if (client.buffer.length < 4) return; // Wait for more data
+            payloadLen = client.buffer.readUInt16BE(2);
+            offset = 4;
+        } else if (payloadLen === 127) {
+            if (client.buffer.length < 10) return; // Wait for more data
+            payloadLen = Number(client.buffer.readBigUInt64BE(2));
+            offset = 10;
+        }
+
+        const totalFrameLen = offset + (isMasked ? 4 : 0) + payloadLen;
+        if (client.buffer.length < totalFrameLen) return; // Wait for full frame
+
+        let mask = null;
+        if (isMasked) {
+            mask = client.buffer.subarray(offset, offset + 4);
+            offset += 4;
+        }
+
+        const payload = Buffer.from(client.buffer.subarray(offset, offset + payloadLen));
+        client.buffer = client.buffer.subarray(totalFrameLen);
+
+        if (isMasked && mask) {
+            for (let i = 0; i < payload.length; i++) {
+                payload[i] ^= mask[i % 4];
+            }
+        }
+
+        if (opcode === 0x8) {
+            // Close frame
+            handleDisconnect(client);
+            return;
+        } else if (opcode === 0x9) {
+            // Ping -> send Pong
+            sendRawFrame(client.socket, 0x8a, payload);
+        } else if (opcode === 0x1) {
+            // Text frame
+            const text = payload.toString('utf8');
+            handleMessage(client, text);
+        }
     }
 }
 
-function setupEntities() {
-    // Oyuncu (Yaya)
-    const pGeo = new THREE.CapsuleGeometry(0.4, 1, 4, 8);
-    const pMat = new THREE.MeshStandardMaterial({ color: 0x00cec9, roughness: 0.4 });
-    player = new THREE.Mesh(pGeo, pMat);
-    player.position.copy(pState.pos);
-    player.castShadow = true;
-    scene.add(player);
-
-    // Araç (PBR Metalik Yansımalı)
-    car = new THREE.Group();
-    
-    const bodyMat = new THREE.MeshStandardMaterial({ color: 0xd63031, metalness: 0.8, roughness: 0.2 });
-    const body = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.8, 4.5), bodyMat);
-    body.position.y = 0.7;
-    body.castShadow = true;
-    car.add(body);
-    
-    const cabinMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.9, roughness: 0.1 });
-    const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.7, 2.2), cabinMat);
-    cabin.position.set(0, 1.4, -0.2);
-    cabin.castShadow = true;
-    car.add(cabin);
-
-    scene.add(car);
-    car.position.copy(cState.pos);
-}
-
-function setupInput() {
-    window.addEventListener('keydown', e => handleKey(e.code, true));
-    window.addEventListener('keyup', e => handleKey(e.code, false));
-
-    const binds = { 'btn-up': 'up', 'btn-down': 'down', 'btn-left': 'left', 'btn-right': 'right' };
-    for(let id in binds) {
-        const el = document.getElementById(id);
-        el.addEventListener('touchstart', (e) => { e.preventDefault(); keys[binds[id]] = true; });
-        el.addEventListener('touchend', (e) => { e.preventDefault(); keys[binds[id]] = false; });
+function handleMessage(client, rawJson) {
+    let msg;
+    try {
+        msg = JSON.parse(rawJson);
+    } catch (e) {
+        return;
     }
 
-    const actionBtn = document.getElementById('btn-action');
-    actionBtn.addEventListener('touchstart', e => { e.preventDefault(); toggleCar(); });
-    actionBtn.addEventListener('mousedown', e => { e.preventDefault(); toggleCar(); });
+    if (!msg || !msg.type) return;
+
+    switch (msg.type) {
+        case 'join': {
+            if (!msg.id) return;
+            client.playerId = msg.id;
+
+            const updatePacket = { ...msg, type: 'playerUpdate' };
+            playerStates.set(msg.id, updatePacket);
+
+            // Send initial world snapshot to the joining player
+            const otherPlayers = [];
+            playerStates.forEach((p, id) => {
+                if (id !== msg.id) otherPlayers.push(p);
+            });
+
+            const initPacket = JSON.stringify({
+                type: 'init',
+                selfId: msg.id,
+                players: otherPlayers,
+                props: spawnedProps,
+                cars: Array.from(carStates.values())
+            });
+            sendMessage(client, initPacket);
+
+            // Notify everyone else
+            broadcast(JSON.stringify(updatePacket), client);
+            console.log(`[+] Player joined: ${msg.id} (Total: ${playerStates.size})`);
+            break;
+        }
+
+        case 'playerUpdate': {
+            if (!msg.id) return;
+            client.playerId = msg.id;
+            playerStates.set(msg.id, msg);
+            broadcast(rawJson, client);
+            break;
+        }
+
+        case 'spawnProp': {
+            if (spawnedProps.length >= 100) {
+                spawnedProps.shift();
+            }
+            spawnedProps.push(msg);
+            broadcast(rawJson, client);
+            break;
+        }
+
+        case 'spawnCar':
+        case 'carUpdate': {
+            if (msg.id) {
+                carStates.set(msg.id, msg);
+                broadcast(rawJson, client);
+            }
+            break;
+        }
+
+        case 'impulseProp':
+        case 'playerHit':
+        case 'chat': {
+            broadcastAll(rawJson);
+            break;
+        }
+    }
 }
 
-function handleKey(code, state) {
-    if (code === 'KeyW' || code === 'ArrowUp') keys.up = state;
-    if (code === 'KeyS' || code === 'ArrowDown') keys.down = state;
-    if (code === 'KeyA' || code === 'ArrowLeft') keys.left = state;
-    if (code === 'KeyD' || code === 'ArrowRight') keys.right = state;
-    if (code === 'KeyF' && state && canEnterCar) toggleCar();
+function sendMessage(client, text) {
+    const payload = Buffer.from(text, 'utf8');
+    sendRawFrame(client.socket, 0x81, payload);
 }
 
-function toggleCar() {
-    isInCar = !isInCar;
-    document.getElementById('mode-text').innerText = isInCar ? "Araç Modu" : "Yaya Modu";
-    document.getElementById('speed-display').style.display = isInCar ? "block" : "none";
-    document.getElementById('interaction-prompt').style.display = "none";
-    document.getElementById('btn-action').style.display = "none";
-    
-    if (isInCar) {
-        player.visible = false;
+function sendRawFrame(socket, firstByte, payload) {
+    if (socket.destroyed) return;
+
+    let header;
+    const len = payload.length;
+
+    if (len <= 125) {
+        header = Buffer.from([firstByte, len]);
+    } else if (len <= 65535) {
+        header = Buffer.alloc(4);
+        header[0] = firstByte;
+        header[1] = 126;
+        header.writeUInt16BE(len, 2);
     } else {
-        player.visible = true;
-        pState.pos.x = cState.pos.x - Math.cos(cState.angle) * 2.5;
-        pState.pos.z = cState.pos.z + Math.sin(cState.angle) * 2.5;
-        player.position.copy(pState.pos);
-        pState.angle = cState.angle;
+        header = Buffer.alloc(10);
+        header[0] = firstByte;
+        header[1] = 127;
+        header.writeBigUInt64BE(BigInt(len), 2);
     }
-    canEnterCar = false;
-}
 
-function checkCollisions(targetPos, radius) {
-    const sphere = new THREE.Sphere(targetPos, radius);
-    for(let obs of obstacles) {
-        if (obs.intersectsSphere(sphere)) return true;
-    }
-    return false;
-}
-
-function updateLogic() {
-    if (!isInCar) {
-        // Yaya Fiziği
-        if (keys.up) {
-            const nextPos = pState.pos.clone();
-            nextPos.x += Math.sin(pState.angle) * pState.speed;
-            nextPos.z += Math.cos(pState.angle) * pState.speed;
-            if(!checkCollisions(nextPos, 0.4)) pState.pos.copy(nextPos);
-        }
-        if (keys.down) {
-            const nextPos = pState.pos.clone();
-            nextPos.x -= Math.sin(pState.angle) * pState.speed;
-            nextPos.z -= Math.cos(pState.angle) * pState.speed;
-            if(!checkCollisions(nextPos, 0.4)) pState.pos.copy(nextPos);
-        }
-        if (keys.left) pState.angle += 0.05;
-        if (keys.right) pState.angle -= 0.05;
-
-        player.position.copy(pState.pos);
-        player.rotation.y = pState.angle;
-
-        camera.position.lerp(new THREE.Vector3(
-            pState.pos.x - Math.sin(pState.angle) * 4,
-            pState.pos.y + 2,
-            pState.pos.z - Math.cos(pState.angle) * 4
-        ), 0.15);
-        camera.lookAt(pState.pos.x, pState.pos.y + 1, pState.pos.z);
-
-        const dist = pState.pos.distanceTo(cState.pos);
-        if (dist < 3.5) {
-            canEnterCar = true;
-            document.getElementById('interaction-prompt').style.display = "block";
-            document.getElementById('btn-action').style.display = "flex";
-        } else {
-            canEnterCar = false;
-            document.getElementById('interaction-prompt').style.display = "none";
-            document.getElementById('btn-action').style.display = "none";
-        }
-
-    } else {
-        // Araç Fiziği
-        if (keys.up) cState.speed = Math.min(cState.speed + cState.accel, cState.maxSpeed);
-        else if (keys.down) cState.speed = Math.max(cState.speed - cState.accel, -cState.maxSpeed * 0.4);
-        else cState.speed *= cState.friction;
-
-        if (Math.abs(cState.speed) > 0.01) {
-            const dir = cState.speed > 0 ? 1 : -1;
-            if (keys.left) cState.angle += 0.035 * dir;
-            if (keys.right) cState.angle -= 0.035 * dir;
-        }
-
-        const nextPos = cState.pos.clone();
-        nextPos.x += Math.sin(cState.angle) * cState.speed;
-        nextPos.z += Math.cos(cState.angle) * cState.speed;
-
-        if(!checkCollisions(nextPos, 2.0)) {
-            cState.pos.copy(nextPos);
-        } else {
-            cState.speed *= -0.4;
-        }
-
-        car.position.copy(cState.pos);
-        car.rotation.y = cState.angle;
-
-        camera.position.lerp(new THREE.Vector3(
-            cState.pos.x - Math.sin(cState.angle) * 9,
-            cState.pos.y + 4.5,
-            cState.pos.z - Math.cos(cState.angle) * 9
-        ), 0.1);
-        camera.lookAt(cState.pos.x, cState.pos.y + 1, cState.pos.z);
-
-        document.getElementById('speed').innerText = Math.round(Math.abs(cState.speed) * 140);
-        document.getElementById('btn-action').style.display = "flex";
-        canEnterCar = true;
+    try {
+        socket.write(Buffer.concat([header, payload]));
+    } catch (err) {
+        socket.destroy();
     }
 }
 
-function animate() {
-    requestAnimationFrame(animate);
-    updateLogic();
-    renderer.render(scene, camera);
+function broadcast(text, excludeClient) {
+    clients.forEach((client) => {
+        if (client !== excludeClient) {
+            sendMessage(client, text);
+        }
+    });
 }
 
-function onWindowResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+function broadcastAll(text) {
+    broadcast(text, null);
 }
 
-init();
+function handleDisconnect(client) {
+    if (!clients.has(client)) return;
+    clients.delete(client);
+
+    if (client.playerId) {
+        const id = client.playerId;
+        playerStates.delete(id);
+
+        // Free any car this player was driving
+        carStates.forEach((car) => {
+            if (car.driverId === id) {
+                car.driverId = '';
+                broadcastAll(JSON.stringify(car));
+            }
+        });
+
+        broadcastAll(JSON.stringify({ type: 'playerLeave', id }));
+        console.log(`[-] Player left: ${id} (Total: ${playerStates.size})`);
+        client.playerId = null;
+    }
+
+    try {
+        client.socket.destroy();
+    } catch (e) {}
+}
+
+server.listen(PORT, '0.0.0.0', () => {
+    console.log('========================================');
+    console.log(`Node.js TCP Server running on port ${PORT}`);
+    console.log(`Connect in game using: 127.0.0.1:${PORT}`);
+    console.log('========================================');
+});
