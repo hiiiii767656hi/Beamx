@@ -114,11 +114,11 @@
     <!-- Start Screen -->
     <div id="startScreen" class="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/90 backdrop-blur-sm no-select">
         <h1 class="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-fuchsia-500 mb-2 drop-shadow-[0_0_15px_rgba(0,255,255,0.5)] text-center tracking-tighter">PHYSICS SANDBOX</h1>
-        <p class="text-xl text-fuchsia-300 mb-6 tracking-widest uppercase font-semibold">UDP Port 7777 + Drivable Cars</p>
+        <p class="text-xl text-fuchsia-300 mb-6 tracking-widest uppercase font-semibold">TCP Port 7777 + Drivable Cars</p>
         
-        <!-- Server IP Input (Defaults to Port 7777) -->
+        <!-- Server IP Input (Defaults to 127.0.0.1:7777) -->
         <div class="flex flex-col items-center gap-3 mb-6 w-80 pointer-events-auto">
-            <label for="serverIpInput" class="text-xs uppercase tracking-wider text-cyan-300 font-bold">Server IP & Port (UDP / Bridge 7777)</label>
+            <label for="serverIpInput" class="text-xs uppercase tracking-wider text-cyan-300 font-bold">Server IP & Port (TCP 7777)</label>
             <div class="flex w-full gap-2">
                 <input
                     id="serverIpInput"
@@ -133,7 +133,7 @@
             </div>
         </div>
 
-        <p id="authStatus" class="text-gray-400 mb-6 font-mono text-sm">Ready to connect on Port 7777</p>
+        <p id="authStatus" class="text-gray-400 mb-6 font-mono text-sm">Enter Server IP and click Connect (or Play Offline)</p>
 
         <button id="playBtn" class="px-12 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold rounded-full text-2xl transition-transform hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(6,182,212,0.6)] pointer-events-auto border-2 border-cyan-300">
             ENTER PLAYGROUND
@@ -330,7 +330,7 @@
         }
         buildMap();
 
-        // --- Player Physics ---
+        // --- Player Physics (Fixed Collision & Jumping) ---
         const playerRadius = 0.8;
         const playerMass = 5;
         const playerBody = new CANNON.Body({
@@ -367,8 +367,8 @@
         }
 
         // --- Car System (Enter, Drive, Exit, Multiplayer Sync) ---
-        const activeCars = {}; // id -> car object
-        let drivingCar = null; // reference to car currently driven by local player
+        const activeCars = {};
+        let drivingCar = null;
 
         function createCarObject(id, data) {
             if (activeCars[id]) return activeCars[id];
@@ -391,7 +391,7 @@
             cabinMesh.castShadow = true;
             group.add(cabinMesh);
 
-            // Neon Headlights & Taillights
+            // Headlights & Taillights
             const headlightMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
             const taillightMat = new THREE.MeshBasicMaterial({ color: 0xff0044 });
             const frontStrip = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.15, 0.1), headlightMat);
@@ -410,10 +410,10 @@
 
             const wheels = [];
             const wheelPositions = [
-                [-1.35, 0.55, -1.5], // Front Left
-                [1.35, 0.55, -1.5],  // Front Right
-                [-1.35, 0.55, 1.5],  // Rear Left
-                [1.35, 0.55, 1.5]    // Rear Right
+                [-1.35, 0.55, -1.5],
+                [1.35, 0.55, -1.5],
+                [-1.35, 0.55, 1.5],
+                [1.35, 0.55, 1.5]
             ];
 
             wheelPositions.forEach((pos, idx) => {
@@ -428,13 +428,11 @@
                 wheels.push({ pivot: wheelPivot, mesh: wMesh, isFront: idx < 2 });
             });
 
-            // Hitbox for Raycaster & Interaction
             chassisMesh.userData = { isCar: true, id: id };
             intersectableObjects.push(chassisMesh);
 
             scene.add(group);
 
-            // Cannon Physics Body for Car
             const body = new CANNON.Body({
                 mass: 40,
                 material: physicsMaterial,
@@ -442,7 +440,6 @@
                 angularDamping: 0.6,
                 allowSleep: false
             });
-            // Compound shape: main box + lower center of mass so the car stays upright
             body.addShape(new CANNON.Box(new CANNON.Vec3(1.3, 0.65, 2.4)), new CANNON.Vec3(0, 0.65, 0));
             body.position.set(data.x || 0, data.y || 3, data.z || 0);
             if (data.qx !== undefined) {
@@ -461,7 +458,6 @@
                 wheels,
                 body,
                 driverId: data.driverId || null,
-                speed: 0,
                 steerAngle: 0,
                 wheelSpin: 0
             };
@@ -470,7 +466,7 @@
             return car;
         }
 
-        // Spawn 2 default cars on the map so all players have immediate access
+        // Pre-spawn 2 default cars on the map
         createCarObject('car_default_1', { x: 14, y: 4, z: 12, color: '#00f5d4' });
         createCarObject('car_default_2', { x: -14, y: 4, z: 12, color: '#f72585' });
 
@@ -495,10 +491,10 @@
 
         function findNearestAvailableCar() {
             let bestCar = null;
-            let minDist = 5.5; // Interaction range
+            let minDist = 5.5;
             for (let id in activeCars) {
                 const car = activeCars[id];
-                if (car.driverId && car.driverId !== userId) continue; // Occupied by someone else
+                if (car.driverId && car.driverId !== userId) continue;
                 const dist = playerObj.position.distanceTo(car.group.position);
                 if (dist < minDist) {
                     minDist = dist;
@@ -512,12 +508,11 @@
             if (!isPlaying || isShatteredLocal) return;
 
             if (drivingCar) {
-                // Exit current car
                 const car = drivingCar;
                 car.driverId = null;
                 drivingCar = null;
 
-                // Place player right beside the driver's door
+                // Place player right outside the left driver door
                 const exitOffset = new THREE.Vector3(-2.6, 1.8, 0);
                 exitOffset.applyQuaternion(car.group.quaternion);
                 playerBody.position.set(
@@ -528,23 +523,18 @@
                 playerBody.velocity.set(0, 0, 0);
                 world.addBody(playerBody);
 
-                // Reset camera height for walking
                 pitchObj.position.set(0, 1.2, 0);
 
                 sendCarState(car);
                 syncPlayerState();
             } else {
-                // Try entering nearest car
                 const nearCar = findNearestAvailableCar();
                 if (!nearCar) return;
 
                 drivingCar = nearCar;
                 drivingCar.driverId = userId;
 
-                // Remove player sphere collider while inside the vehicle
                 world.removeBody(playerBody);
-
-                // Elevate camera slightly for a clear driving view
                 pitchObj.position.set(0, 2.5, 2.2);
 
                 sendCarState(drivingCar);
@@ -574,89 +564,44 @@
                 qz: car.body.quaternion.z,
                 qw: car.body.quaternion.w,
                 steerAngle: car.steerAngle,
-                driverId: car.driverId
+                driverId: car.driverId || ""
             });
         }
 
-        // --- UDP (dgram) + WebSocket Port 7777 Networking ---
+        // --- Pure TCP WebSocket Networking (Port 7777) ---
         let socket = null;
-        let udpSocket = null;
-        let udpHost = "127.0.0.1";
-        let udpPort = 7777;
         let isConnected = false;
         let remotePlayers = {};
         let lastSyncTime = 0;
         const activeProps = {};
 
-        function parseHostPort(rawInput) {
-            let clean = rawInput.trim().replace(/^ws:\/\/|^wss:\/\/|^udp:\/\//i, '');
-            if (!clean) clean = "127.0.0.1:7777";
-            const parts = clean.split(':');
-            return {
-                host: parts[0] || "127.0.0.1",
-                port: parseInt(parts[1] || "7777", 10)
-            };
+        function formatWsUrl(rawInput) {
+            let addr = rawInput.trim();
+            if (!addr) addr = "127.0.0.1:7777";
+            if (!addr.startsWith("ws://") && !addr.startsWith("wss://")) {
+                addr = "ws://" + addr;
+            }
+            return addr;
         }
 
         function connectToServer() {
-            const target = parseHostPort(serverIpInput.value);
-            udpHost = target.host;
-            udpPort = target.port;
-
-            // 1. Check if running in an environment with native Node UDP (Electron / NW.js)
-            if (typeof window.require === 'function') {
-                try {
-                    const dgram = window.require('dgram');
-                    if (udpSocket) udpSocket.close();
-                    udpSocket = dgram.createSocket('udp4');
-
-                    udpSocket.on('message', (msg) => {
-                        try {
-                            handleServerMessage(JSON.parse(msg.toString()));
-                        } catch (e) {}
-                    });
-
-                    udpSocket.on('error', (err) => {
-                        console.error("UDP error:", err);
-                    });
-
-                    isConnected = true;
-                    authStatus.innerText = `Connected via Native UDP to ${udpHost}:${udpPort}`;
-                    authStatus.className = "text-green-400 mb-6 font-mono text-sm";
-
-                    sendPacket({
-                        type: "join",
-                        id: userId,
-                        color: myColor,
-                        x: playerBody.position.x,
-                        y: playerBody.position.y,
-                        z: playerBody.position.z,
-                        yaw: yawObj.rotation.y
-                    });
-                    return;
-                } catch (e) {
-                    // Fallback to WebSocket on port 7777
-                }
-            }
-
-            // 2. Standard Browser Connection to Port 7777
-            const wsUrl = `ws://${udpHost}:${udpPort}`;
+            const wsUrl = formatWsUrl(serverIpInput.value);
             if (socket) socket.close();
 
-            authStatus.innerText = `Connecting to ${wsUrl}...`;
+            authStatus.innerText = `Connecting via TCP to ${wsUrl}...`;
             authStatus.className = "text-cyan-400 mb-6 font-mono text-sm animate-pulse";
 
             try {
                 socket = new WebSocket(wsUrl);
             } catch (err) {
-                authStatus.innerText = "Invalid Server Address.";
+                authStatus.innerText = "Invalid Server IP format.";
                 authStatus.className = "text-red-400 mb-6 font-mono text-sm";
                 return;
             }
 
             socket.onopen = () => {
                 isConnected = true;
-                authStatus.innerText = `Connected to Server (${udpHost}:${udpPort})`;
+                authStatus.innerText = `Connected via TCP (${wsUrl})`;
                 authStatus.className = "text-green-400 mb-6 font-mono text-sm";
 
                 sendPacket({
@@ -673,11 +618,13 @@
             socket.onmessage = (event) => {
                 try {
                     handleServerMessage(JSON.parse(event.data));
-                } catch (e) {}
+                } catch (e) {
+                    console.error("Invalid packet:", e);
+                }
             };
 
             socket.onerror = () => {
-                authStatus.innerText = `Offline Mode Ready (Could not reach ${udpHost}:${udpPort})`;
+                authStatus.innerText = `Offline Mode Ready (Could not reach ${wsUrl})`;
                 authStatus.className = "text-amber-400 mb-6 font-mono text-sm";
             };
 
@@ -690,12 +637,8 @@
         connectBtn.addEventListener('click', connectToServer);
 
         function sendPacket(obj) {
-            const payload = JSON.stringify(obj);
-            if (udpSocket) {
-                const buf = Buffer.from(payload);
-                udpSocket.send(buf, 0, buf.length, udpPort, udpHost);
-            } else if (socket && socket.readyState === WebSocket.OPEN) {
-                socket.send(payload);
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify(obj));
             }
         }
 
@@ -704,6 +647,7 @@
 
             switch (msg.type) {
                 case "init":
+                    userId = msg.selfId || userId;
                     if (Array.isArray(msg.players)) {
                         msg.players.forEach(p => {
                             if (p.id !== userId) updateOrCreateRemotePlayer(p);
@@ -722,7 +666,6 @@
                     }
                     break;
 
-                case "join":
                 case "playerUpdate":
                     if (msg.id && msg.id !== userId) {
                         updateOrCreateRemotePlayer(msg);
@@ -775,7 +718,7 @@
         }
 
         function applyRemoteCarState(car, data) {
-            car.driverId = data.driverId || null;
+            car.driverId = (data.driverId && data.driverId !== "") ? data.driverId : null;
             car.steerAngle = data.steerAngle || 0;
             car.body.position.set(data.x, data.y, data.z);
             if (data.vx !== undefined) {
@@ -793,14 +736,17 @@
             const rp = remotePlayers[data.id];
             rp.targetPos.set(data.x, data.y - playerRadius, data.z);
             rp.targetRotY = data.yaw || 0;
-            rp.inCar = !!data.inCar;
 
-            // Hide player mesh if they are shattered, or position them in the car
             if (data.isShattered && !rp.isShattered) triggerRemoteShatter(rp);
             else if (!data.isShattered && rp.isShattered) recoverRemoteShatter(rp);
         }
 
         function removeRemotePlayer(id) {
+            for (let carId in activeCars) {
+                if (activeCars[carId].driverId === id) {
+                    activeCars[carId].driverId = null;
+                }
+            }
             if (remotePlayers[id]) {
                 scene.remove(remotePlayers[id].group);
                 const index = intersectableObjects.indexOf(remotePlayers[id].hitMesh);
@@ -860,7 +806,7 @@
         function syncPlayerState() {
             if (!isPlaying || !isConnected) return;
             const now = Date.now();
-            if (now - lastSyncTime < 45) return; // ~22Hz UDP/WS sync rate
+            if (now - lastSyncTime < 50) return; // 20Hz sync rate
             lastSyncTime = now;
 
             const pos = drivingCar ? drivingCar.body.position : playerBody.position;
@@ -872,8 +818,7 @@
                 z: pos.z,
                 yaw: yawObj.rotation.y,
                 color: myColor,
-                isShattered: isShatteredLocal,
-                inCar: drivingCar ? drivingCar.id : null
+                isShattered: isShatteredLocal
             });
 
             if (drivingCar) {
@@ -900,9 +845,10 @@
         function sendChat() {
             const text = chatInput.value.trim();
             if (!text) return;
-            appendChatMessage(userId, myColor, text);
             if (isConnected) {
                 sendPacket({ type: "chat", uid: userId, color: myColor, text: text });
+            } else {
+                appendChatMessage(userId, myColor, text);
             }
             chatInput.value = '';
         }
@@ -938,15 +884,16 @@
                         px: hit.point.x, py: hit.point.y, pz: hit.point.z
                     };
 
-                    if (activeProps[obj.userData.id]) {
+                    if (!isConnected && activeProps[obj.userData.id]) {
                         const prop = activeProps[obj.userData.id];
                         prop.body.wakeUp();
                         prop.body.applyImpulse(
                             new CANNON.Vec3(impulsePacket.fx, impulsePacket.fy, impulsePacket.fz),
                             new CANNON.Vec3(impulsePacket.px, impulsePacket.py, impulsePacket.pz)
                         );
+                    } else {
+                        sendPacket(impulsePacket);
                     }
-                    sendPacket(impulsePacket);
                 } else if (obj.userData.isCar) {
                     const car = activeCars[obj.userData.id];
                     if (car) {
@@ -996,7 +943,7 @@
             hitMesh.userData = { isPlayer: true, playerId: id };
             intersectableObjects.push(hitMesh);
 
-            return { group, hitMesh, targetPos: new THREE.Vector3(0, 10, 0), targetRotY: 0, isShattered: false, baseColor: colorHex, inCar: false };
+            return { group, hitMesh, targetPos: new THREE.Vector3(0, 10, 0), targetRotY: 0, isShattered: false, baseColor: colorHex };
         }
 
         function spawnPhysicalShatter(position, colorHex) {
@@ -1208,14 +1155,13 @@
 
                     const carBody = drivingCar.body;
 
-                    // Keep car upright so it doesn't roll upside down easily
+                    // Keep car stabilized upright
                     const euler = new CANNON.Vec3();
                     carBody.quaternion.toEuler(euler);
                     carBody.quaternion.setFromEuler(euler.x * 0.85, euler.y, euler.z * 0.85);
 
                     drivingCar.steerAngle = THREE.MathUtils.lerp(drivingCar.steerAngle, steer * 0.55, 10 * dt);
 
-                    // Forward direction of the car
                     const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(drivingCar.group.quaternion);
                     forward.y = 0;
                     forward.normalize();
@@ -1224,7 +1170,6 @@
                     const forwardSpeed = currentVel.dot(forward);
 
                     if (keys.space) {
-                        // Handbrake
                         carBody.velocity.x *= 0.88;
                         carBody.velocity.z *= 0.88;
                     } else if (throttle !== 0) {
@@ -1234,12 +1179,10 @@
                         carBody.velocity.x = forward.x * targetSpeed;
                         carBody.velocity.z = forward.z * targetSpeed;
                     } else {
-                        // Natural rolling deceleration
                         carBody.velocity.x *= 0.97;
                         carBody.velocity.z *= 0.97;
                     }
 
-                    // Turn car yaw when moving
                     if (Math.abs(forwardSpeed) > 0.5) {
                         const dirSign = forwardSpeed >= 0 ? 1 : -1;
                         const turnRate = drivingCar.steerAngle * dirSign * Math.min(Math.abs(forwardSpeed) / 10, 1.8);
@@ -1248,7 +1191,6 @@
                         carBody.angularVelocity.y *= 0.5;
                     }
 
-                    // Lock player camera rig onto the car
                     playerObj.position.copy(carBody.position);
                     syncPlayerState();
                 } else {
@@ -1274,7 +1216,6 @@
 
                     playerObj.position.copy(playerBody.position);
 
-                    // Show prompt if near a car
                     const nearCar = findNearestAvailableCar();
                     if (nearCar) {
                         vehiclePrompt.classList.remove('hidden');
