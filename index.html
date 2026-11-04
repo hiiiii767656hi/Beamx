@@ -1,40 +1,1359 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Realistic 3D Sandbox</title>
-    <link rel="stylesheet" href="style.css">
-    <!-- Three.js Motoru -->
+    <title>3D Multiplayer Physics Sandbox</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; color: white; font-family: 'Inter', sans-serif; touch-action: none; }
+        canvas { display: block; width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
+        .no-select { user-select: none; -webkit-user-select: none; }
+        
+        /* Crosshair */
+        #crosshair {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 12px; height: 12px; pointer-events: none; z-index: 20;
+        }
+        #crosshair::before, #crosshair::after { content: ''; position: absolute; background: rgba(0, 255, 255, 0.8); }
+        #crosshair::before { top: 5px; left: 0; width: 12px; height: 2px; }
+        #crosshair::after { top: 0; left: 5px; width: 2px; height: 12px; }
+
+        /* Top Action Bar */
+        #topBar {
+            position: absolute; top: 20px; left: 20px; right: 20px;
+            display: flex; justify-content: space-between; z-index: 30; pointer-events: none;
+        }
+        .ui-btn {
+            background: rgba(0, 0, 0, 0.6); border: 2px solid rgba(0, 255, 255, 0.5); color: white;
+            padding: 8px 16px; border-radius: 8px; font-weight: bold; cursor: pointer; pointer-events: auto;
+            backdrop-filter: blur(4px); transition: all 0.2s; text-shadow: 1px 1px 2px black;
+        }
+        .ui-btn:hover { background: rgba(0, 255, 255, 0.2); transform: scale(1.05); }
+        .ui-btn:active { transform: scale(0.95); }
+
+        #settingsBtn { font-size: 1.5rem; padding: 4px 12px; border-radius: 50%; border-color: rgba(255, 255, 255, 0.3); }
+
+        /* Vehicle Prompt Banner */
+        #vehiclePrompt {
+            position: absolute; bottom: 110px; left: 50%; transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.75); border: 2px solid #0ff; color: #0ff;
+            padding: 8px 20px; border-radius: 999px; font-weight: bold; font-size: 0.95rem;
+            z-index: 25; pointer-events: auto; cursor: pointer; backdrop-filter: blur(4px);
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+        }
+
+        /* Settings Modal */
+        #settingsModal {
+            display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(10, 15, 30, 0.95); border: 2px solid #0ff; border-radius: 12px;
+            padding: 24px; z-index: 50; width: 300px; box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+            pointer-events: auto; backdrop-filter: blur(10px);
+        }
+        .modal-header { font-size: 1.25rem; font-weight: bold; margin-bottom: 16px; color: #0ff; border-bottom: 1px solid rgba(0,255,255,0.3); padding-bottom: 8px; }
+        
+        /* Chat System */
+        #chatContainer {
+            position: absolute; bottom: 20px; left: 20px; width: 300px; max-height: 250px;
+            display: flex; flex-direction: column; justify-content: flex-end; z-index: 30; pointer-events: none;
+        }
+        #chatMessages {
+            overflow-y: auto; max-height: 200px; padding-bottom: 8px; pointer-events: auto;
+            text-shadow: 1px 1px 2px black; font-size: 0.9rem; mask-image: linear-gradient(to top, black 80%, transparent 100%);
+        }
+        .chat-msg { margin-bottom: 4px; line-height: 1.2; word-wrap: break-word; }
+        #chatInputContainer { display: flex; opacity: 0.8; transition: opacity 0.2s; pointer-events: auto; }
+        #chatInputContainer:focus-within { opacity: 1; }
+        #chatInput {
+            flex-grow: 1; background: rgba(0,0,0,0.6); border: 1px solid #333; color: white;
+            padding: 8px; border-radius: 4px; outline: none;
+        }
+        #chatInput:focus { border-color: #0ff; background: rgba(0,0,0,0.8); }
+
+        /* Mobile Controls */
+        #mobileControls { display: none; position: absolute; inset: 0; z-index: 15; pointer-events: none; }
+        @media (pointer: coarse) {
+            #mobileControls { display: block; }
+            #instructions { display: none !important; }
+            #chatContainer { bottom: 160px; width: 250px; }
+        }
+        
+        .joystick-zone {
+            position: absolute; bottom: 20px; width: 120px; height: 120px; 
+            background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.2); 
+            border-radius: 50%; display: flex; align-items: center; justify-content: center; 
+            touch-action: none; pointer-events: auto;
+        }
+        #joyLeft { left: 20px; }
+        .joystick-knob { width: 50px; height: 50px; background: rgba(255,255,255,0.5); border-radius: 50%; pointer-events: none; }
+        
+        #rightTouchZone {
+            position: absolute; right: 0; top: 0; width: 50%; height: 100%; 
+            pointer-events: auto; touch-action: none; z-index: 1;
+        }
+
+        .action-btn {
+            position: absolute; width: 60px; height: 60px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: bold; pointer-events: auto; touch-action: none;
+            border: 2px solid rgba(255,255,255,0.4); text-shadow: 1px 1px 2px black;
+            font-size: 0.8rem;
+        }
+        #jumpBtnMobile { bottom: 30px; right: 100px; background: rgba(59, 130, 246, 0.6); }
+        #shootBtnMobile { bottom: 100px; right: 30px; background: rgba(239, 68, 68, 0.6); }
+        #carBtnMobile { bottom: 100px; right: 100px; background: rgba(16, 185, 129, 0.7); }
+        .action-btn:active { transform: scale(0.9); opacity: 0.8; }
+
+        #startScreen { z-index: 50; }
+    </style>
 </head>
 <body>
-    <div id="canvas-container"></div>
-    
-    <div id="ui-layer">
-        <div id="hud">
-            <h2 id="mode-text">Yaya Modu</h2>
-            <div id="speed-display" style="display:none;">
-                <span id="speed">0</span> <span class="unit">KM/H</span>
+
+    <!-- Start Screen -->
+    <div id="startScreen" class="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/90 backdrop-blur-sm no-select">
+        <h1 class="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-fuchsia-500 mb-2 drop-shadow-[0_0_15px_rgba(0,255,255,0.5)] text-center tracking-tighter">PHYSICS SANDBOX</h1>
+        <p class="text-xl text-fuchsia-300 mb-6 tracking-widest uppercase font-semibold">UDP Port 7777 + Drivable Cars</p>
+        
+        <!-- Server IP Input (Defaults to Port 7777) -->
+        <div class="flex flex-col items-center gap-3 mb-6 w-80 pointer-events-auto">
+            <label for="serverIpInput" class="text-xs uppercase tracking-wider text-cyan-300 font-bold">Server IP & Port (UDP / Bridge 7777)</label>
+            <div class="flex w-full gap-2">
+                <input
+                    id="serverIpInput"
+                    type="text"
+                    value="127.0.0.1:7777"
+                    placeholder="127.0.0.1:7777"
+                    class="flex-grow px-4 py-2 bg-black/70 border-2 border-cyan-500/60 rounded-lg text-white font-mono text-sm focus:outline-none focus:border-cyan-300"
+                />
+                <button id="connectBtn" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg text-sm transition-colors">
+                    Connect
+                </button>
             </div>
         </div>
-        
-        <div id="interaction-prompt">Araca Binmek İçin 'F' veya Butona Bas</div>
-        <button id="btn-action">BİN/İN</button>
 
-        <div class="touch-controls">
-            <div class="control-group">
-                <button class="t-btn" id="btn-left">◄</button>
-                <button class="t-btn" id="btn-right">►</button>
-            </div>
-            <div class="control-group">
-                <button class="t-btn" id="btn-down">▼</button>
-                <button class="t-btn" id="btn-up">▲</button>
-            </div>
+        <p id="authStatus" class="text-gray-400 mb-6 font-mono text-sm">Ready to connect on Port 7777</p>
+
+        <button id="playBtn" class="px-12 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold rounded-full text-2xl transition-transform hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(6,182,212,0.6)] pointer-events-auto border-2 border-cyan-300">
+            ENTER PLAYGROUND
+        </button>
+
+        <p id="instructions" class="mt-10 text-gray-400 text-center max-w-lg bg-black/40 p-4 rounded-xl border border-gray-700">
+            <strong class="text-white">Desktop:</strong> Click to lock mouse. WASD to move/drive. Space to Jump/Brake.<br>
+            Press <strong class="text-cyan-400">[E]</strong> near a car to Enter or Exit the vehicle.<br>
+            Left Click to shoot (Raycast). Press ESC to unlock mouse.
+        </p>
+    </div>
+
+    <!-- UI Overlay -->
+    <div id="topBar" class="no-select">
+        <div class="flex gap-3 flex-wrap">
+            <button id="spawnBoxBtn" class="ui-btn">Spawn Box</button>
+            <button id="spawnBallBtn" class="ui-btn">Spawn Ball</button>
+            <button id="spawnCarBtn" class="ui-btn border-fuchsia-400">Spawn Car 🚗</button>
+        </div>
+        <button id="settingsBtn" class="ui-btn">⚙️</button>
+    </div>
+
+    <!-- Enter / Exit Car Prompt -->
+    <div id="vehiclePrompt" class="hidden no-select">Press [E] to Enter Car</div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="no-select">
+        <div class="modal-header">Settings</div>
+        <label class="flex items-center space-x-3 text-gray-200 cursor-pointer mb-6">
+            <input type="checkbox" id="ragdollToggle" checked class="w-5 h-5 accent-cyan-500 bg-gray-800 border-gray-600 rounded">
+            <span>Enable Ragdoll Mode (When Hit)</span>
+        </label>
+        <button id="closeSettingsBtn" class="w-full py-2 bg-gray-700 hover:bg-gray-600 text-white rounded font-bold transition-colors">Close</button>
+    </div>
+
+    <!-- Chat Overlay -->
+    <div id="chatContainer" class="no-select">
+        <div id="chatMessages"></div>
+        <div id="chatInputContainer">
+            <input type="text" id="chatInput" placeholder="Press Enter to chat..." autocomplete="off" maxlength="100">
         </div>
     </div>
 
-    <!-- Oyun Mantığı -->
-    <script src="game.js"></script>
+    <div id="crosshair" class="hidden"></div>
+
+    <!-- Mobile Controls -->
+    <div id="mobileControls" class="no-select">
+        <div id="rightTouchZone"></div>
+        <div id="joyLeft" class="joystick-zone" style="z-index: 10;"><div id="knobLeft" class="joystick-knob"></div></div>
+        <div id="jumpBtnMobile" class="action-btn" style="z-index: 10;">JUMP</div>
+        <div id="shootBtnMobile" class="action-btn" style="z-index: 10;">FIRE</div>
+        <div id="carBtnMobile" class="action-btn" style="z-index: 10;">CAR</div>
+    </div>
+
+    <script>
+        // --- Game State & UI ---
+        let isPlaying = false;
+        let isShatteredLocal = false;
+        let ragdollEnabled = true;
+        let userId = 'u_' + Math.random().toString(36).substring(2, 9);
+        let myColor = '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
+
+        const startScreen = document.getElementById('startScreen');
+        const playBtn = document.getElementById('playBtn');
+        const connectBtn = document.getElementById('connectBtn');
+        const serverIpInput = document.getElementById('serverIpInput');
+        const authStatus = document.getElementById('authStatus');
+        const crosshair = document.getElementById('crosshair');
+        const chatInput = document.getElementById('chatInput');
+        const chatMessages = document.getElementById('chatMessages');
+        const settingsModal = document.getElementById('settingsModal');
+        const vehiclePrompt = document.getElementById('vehiclePrompt');
+
+        document.getElementById('ragdollToggle').addEventListener('change', (e) => { ragdollEnabled = e.target.checked; });
+        document.getElementById('settingsBtn').addEventListener('click', () => {
+            settingsModal.style.display = 'block';
+            if (document.pointerLockElement) document.exitPointerLock();
+        });
+        document.getElementById('closeSettingsBtn').addEventListener('click', () => { settingsModal.style.display = 'none'; });
+
+        // --- Physics (Cannon.js) Setup ---
+        const world = new CANNON.World();
+        world.gravity.set(0, -25, 0);
+        world.broadphase = new CANNON.SAPBroadphase(world);
+        world.solver.iterations = 15;
+
+        const physicsMaterial = new CANNON.Material("standard");
+        const physicsContactMaterial = new CANNON.ContactMaterial(
+            physicsMaterial, physicsMaterial,
+            { friction: 0.0, restitution: 0.0, contactEquationStiffness: 1e8, contactEquationRelaxation: 3 }
+        );
+        world.addContactMaterial(physicsContactMaterial);
+        world.defaultContactMaterial = physicsContactMaterial;
+
+        // --- Graphics (Three.js) Setup ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x050014);
+        scene.fog = new THREE.FogExp2(0x050014, 0.012);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+        const playerObj = new THREE.Object3D();
+        const yawObj = new THREE.Object3D();
+        const pitchObj = new THREE.Object3D();
+        scene.add(playerObj);
+        playerObj.add(yawObj);
+        yawObj.add(pitchObj);
+        pitchObj.add(camera);
+        pitchObj.position.y = 1.2;
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.insertBefore(renderer.domElement, document.body.firstChild);
+
+        const ambient = new THREE.AmbientLight(0x404060, 0.6);
+        scene.add(ambient);
+        const moonLight = new THREE.DirectionalLight(0x55aaff, 0.8);
+        moonLight.position.set(50, 100, -50);
+        moonLight.castShadow = true;
+        moonLight.shadow.camera.left = -120; moonLight.shadow.camera.right = 120;
+        moonLight.shadow.camera.top = 120; moonLight.shadow.camera.bottom = -120;
+        scene.add(moonLight);
+
+        // --- Map Generator ---
+        const intersectableObjects = [];
+
+        function createCheckerboard() {
+            const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#0a0a1a'; ctx.fillRect(0, 0, 512, 512);
+            ctx.fillStyle = '#1a1a3a';
+            for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) if ((i + j) % 2 === 0) ctx.fillRect(i * 64, j * 64, 64, 64);
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+            tex.repeat.set(25, 25);
+            return tex;
+        }
+
+        function addStaticBlock(x, y, z, w, h, d, colorHex, isNeon = false) {
+            const mat = new THREE.MeshStandardMaterial({
+                color: colorHex, roughness: isNeon ? 0.2 : 0.7,
+                emissive: isNeon ? colorHex : 0x000000, emissiveIntensity: isNeon ? 0.5 : 0
+            });
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+            mesh.position.set(x, y + h / 2, z);
+            mesh.castShadow = true; mesh.receiveShadow = true;
+            scene.add(mesh);
+            intersectableObjects.push(mesh);
+
+            const shape = new CANNON.Box(new CANNON.Vec3(w / 2, h / 2, d / 2));
+            const body = new CANNON.Body({ mass: 0, material: physicsMaterial });
+            body.addShape(shape);
+            body.position.copy(mesh.position);
+            world.addBody(body);
+
+            if (isNeon) {
+                const pLight = new THREE.PointLight(colorHex, 1, 30);
+                pLight.position.set(x, y + h + 2, z);
+                scene.add(pLight);
+            }
+        }
+
+        function buildMap() {
+            const floorMat = new THREE.MeshStandardMaterial({ map: createCheckerboard(), roughness: 0.8 });
+            const floorMesh = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), floorMat);
+            floorMesh.rotation.x = -Math.PI / 2;
+            floorMesh.receiveShadow = true;
+            scene.add(floorMesh);
+            intersectableObjects.push(floorMesh);
+
+            const floorBody = new CANNON.Body({
+                mass: 0,
+                shape: new CANNON.Box(new CANNON.Vec3(200, 1, 200)),
+                material: physicsMaterial
+            });
+            floorBody.position.set(0, -1, 0);
+            world.addBody(floorBody);
+
+            addStaticBlock(0, 0, 0, 20, 2, 20, 0x333333);
+            addStaticBlock(0, 2, 0, 10, 8, 10, 0x00ffff, true);
+
+            let px = 20, py = 2, pz = 0;
+            const offsets = [-3, 4, -2, 5, -4, 3, -2, 1];
+            for (let i = 0; i < 8; i++) {
+                addStaticBlock(px, py, pz, 4, 1, 4, 0xff00ff, true);
+                px += 6; py += 2.5; pz += offsets[i];
+            }
+            addStaticBlock(px + 10, 0, pz, 15, py + 10, 15, 0x222244);
+            addStaticBlock(px + 10, py + 10, pz, 17, 2, 17, 0x00ffaa, true);
+
+            for (let i = 0; i < 15; i++) addStaticBlock(-20 - i * 2, i * 0.5, 20, 2, 0.5, 10, 0xff8800);
+        }
+        buildMap();
+
+        // --- Player Physics ---
+        const playerRadius = 0.8;
+        const playerMass = 5;
+        const playerBody = new CANNON.Body({
+            mass: playerMass,
+            material: physicsMaterial,
+            linearDamping: 0.0,
+            allowSleep: false
+        });
+        playerBody.addShape(new CANNON.Sphere(playerRadius));
+        playerBody.position.set(0, 15, 8);
+        playerBody.fixedRotation = true;
+        playerBody.updateMassProperties();
+        world.addBody(playerBody);
+
+        let jumpCooldown = 0;
+
+        function isBodyGrounded(targetBody) {
+            for (let i = 0; i < world.contacts.length; i++) {
+                const c = world.contacts[i];
+                if (c.bi.id === targetBody.id || c.bj.id === targetBody.id) {
+                    const upNormalY = (c.bi.id === targetBody.id) ? -c.ni.y : c.ni.y;
+                    if (upNormalY > 0.45) return true;
+                }
+            }
+            return false;
+        }
+
+        function tryJump() {
+            if (drivingCar || isShatteredLocal || jumpCooldown > 0) return;
+            if (isBodyGrounded(playerBody)) {
+                playerBody.velocity.y = 13;
+                jumpCooldown = 0.15;
+            }
+        }
+
+        // --- Car System (Enter, Drive, Exit, Multiplayer Sync) ---
+        const activeCars = {}; // id -> car object
+        let drivingCar = null; // reference to car currently driven by local player
+
+        function createCarObject(id, data) {
+            if (activeCars[id]) return activeCars[id];
+
+            const color = data.color || '#ff0055';
+            const group = new THREE.Group();
+
+            // Main Chassis
+            const chassisMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.3, metalness: 0.6 });
+            const chassisMesh = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.9, 4.8), chassisMat);
+            chassisMesh.position.y = 0.75;
+            chassisMesh.castShadow = true;
+            chassisMesh.receiveShadow = true;
+            group.add(chassisMesh);
+
+            // Cabin / Windshield
+            const cabinMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.1, metalness: 0.9 });
+            const cabinMesh = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.75, 2.4), cabinMat);
+            cabinMesh.position.set(0, 1.5, -0.2);
+            cabinMesh.castShadow = true;
+            group.add(cabinMesh);
+
+            // Neon Headlights & Taillights
+            const headlightMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
+            const taillightMat = new THREE.MeshBasicMaterial({ color: 0xff0044 });
+            const frontStrip = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.15, 0.1), headlightMat);
+            frontStrip.position.set(0, 0.8, -2.41);
+            group.add(frontStrip);
+
+            const rearStrip = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.15, 0.1), taillightMat);
+            rearStrip.position.set(0, 0.8, 2.41);
+            group.add(rearStrip);
+
+            // 4 Wheels
+            const wheelGeo = new THREE.CylinderGeometry(0.55, 0.55, 0.45, 16);
+            wheelGeo.rotateZ(Math.PI / 2);
+            const wheelMat = new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.8 });
+            const rimMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
+
+            const wheels = [];
+            const wheelPositions = [
+                [-1.35, 0.55, -1.5], // Front Left
+                [1.35, 0.55, -1.5],  // Front Right
+                [-1.35, 0.55, 1.5],  // Rear Left
+                [1.35, 0.55, 1.5]    // Rear Right
+            ];
+
+            wheelPositions.forEach((pos, idx) => {
+                const wheelPivot = new THREE.Object3D();
+                wheelPivot.position.set(pos[0], pos[1], pos[2]);
+                const wMesh = new THREE.Mesh(wheelGeo, wheelMat);
+                wMesh.castShadow = true;
+                const rim = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.6, 0.15), rimMat);
+                wMesh.add(rim);
+                wheelPivot.add(wMesh);
+                group.add(wheelPivot);
+                wheels.push({ pivot: wheelPivot, mesh: wMesh, isFront: idx < 2 });
+            });
+
+            // Hitbox for Raycaster & Interaction
+            chassisMesh.userData = { isCar: true, id: id };
+            intersectableObjects.push(chassisMesh);
+
+            scene.add(group);
+
+            // Cannon Physics Body for Car
+            const body = new CANNON.Body({
+                mass: 40,
+                material: physicsMaterial,
+                linearDamping: 0.15,
+                angularDamping: 0.6,
+                allowSleep: false
+            });
+            // Compound shape: main box + lower center of mass so the car stays upright
+            body.addShape(new CANNON.Box(new CANNON.Vec3(1.3, 0.65, 2.4)), new CANNON.Vec3(0, 0.65, 0));
+            body.position.set(data.x || 0, data.y || 3, data.z || 0);
+            if (data.qx !== undefined) {
+                body.quaternion.set(data.qx, data.qy, data.qz, data.qw);
+            }
+            world.addBody(body);
+
+            group.position.copy(body.position);
+            group.quaternion.copy(body.quaternion);
+
+            const car = {
+                id,
+                color,
+                group,
+                chassisMesh,
+                wheels,
+                body,
+                driverId: data.driverId || null,
+                speed: 0,
+                steerAngle: 0,
+                wheelSpin: 0
+            };
+
+            activeCars[id] = car;
+            return car;
+        }
+
+        // Spawn 2 default cars on the map so all players have immediate access
+        createCarObject('car_default_1', { x: 14, y: 4, z: 12, color: '#00f5d4' });
+        createCarObject('car_default_2', { x: -14, y: 4, z: 12, color: '#f72585' });
+
+        document.getElementById('spawnCarBtn').addEventListener('click', () => {
+            const dir = new THREE.Vector3();
+            camera.getWorldDirection(dir);
+            const basePos = drivingCar ? drivingCar.body.position : playerObj.position;
+            const pos = new THREE.Vector3(basePos.x, basePos.y, basePos.z).addScaledVector(dir, 7);
+            pos.y += 3;
+
+            const carData = {
+                type: "spawnCar",
+                id: 'car_' + Date.now() + '_' + Math.random().toString(36).substring(2, 5),
+                color: '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0'),
+                x: pos.x, y: pos.y, z: pos.z,
+                qx: 0, qy: 0, qz: 0, qw: 1,
+                driverId: null
+            };
+            createCarObject(carData.id, carData);
+            sendPacket(carData);
+        });
+
+        function findNearestAvailableCar() {
+            let bestCar = null;
+            let minDist = 5.5; // Interaction range
+            for (let id in activeCars) {
+                const car = activeCars[id];
+                if (car.driverId && car.driverId !== userId) continue; // Occupied by someone else
+                const dist = playerObj.position.distanceTo(car.group.position);
+                if (dist < minDist) {
+                    minDist = dist;
+                    bestCar = car;
+                }
+            }
+            return bestCar;
+        }
+
+        function toggleEnterExitCar() {
+            if (!isPlaying || isShatteredLocal) return;
+
+            if (drivingCar) {
+                // Exit current car
+                const car = drivingCar;
+                car.driverId = null;
+                drivingCar = null;
+
+                // Place player right beside the driver's door
+                const exitOffset = new THREE.Vector3(-2.6, 1.8, 0);
+                exitOffset.applyQuaternion(car.group.quaternion);
+                playerBody.position.set(
+                    car.body.position.x + exitOffset.x,
+                    car.body.position.y + exitOffset.y,
+                    car.body.position.z + exitOffset.z
+                );
+                playerBody.velocity.set(0, 0, 0);
+                world.addBody(playerBody);
+
+                // Reset camera height for walking
+                pitchObj.position.set(0, 1.2, 0);
+
+                sendCarState(car);
+                syncPlayerState();
+            } else {
+                // Try entering nearest car
+                const nearCar = findNearestAvailableCar();
+                if (!nearCar) return;
+
+                drivingCar = nearCar;
+                drivingCar.driverId = userId;
+
+                // Remove player sphere collider while inside the vehicle
+                world.removeBody(playerBody);
+
+                // Elevate camera slightly for a clear driving view
+                pitchObj.position.set(0, 2.5, 2.2);
+
+                sendCarState(drivingCar);
+                syncPlayerState();
+            }
+        }
+
+        vehiclePrompt.addEventListener('click', toggleEnterExitCar);
+        document.getElementById('carBtnMobile').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            toggleEnterExitCar();
+        }, { passive: false });
+
+        function sendCarState(car) {
+            sendPacket({
+                type: "carUpdate",
+                id: car.id,
+                color: car.color,
+                x: car.body.position.x,
+                y: car.body.position.y,
+                z: car.body.position.z,
+                vx: car.body.velocity.x,
+                vy: car.body.velocity.y,
+                vz: car.body.velocity.z,
+                qx: car.body.quaternion.x,
+                qy: car.body.quaternion.y,
+                qz: car.body.quaternion.z,
+                qw: car.body.quaternion.w,
+                steerAngle: car.steerAngle,
+                driverId: car.driverId
+            });
+        }
+
+        // --- UDP (dgram) + WebSocket Port 7777 Networking ---
+        let socket = null;
+        let udpSocket = null;
+        let udpHost = "127.0.0.1";
+        let udpPort = 7777;
+        let isConnected = false;
+        let remotePlayers = {};
+        let lastSyncTime = 0;
+        const activeProps = {};
+
+        function parseHostPort(rawInput) {
+            let clean = rawInput.trim().replace(/^ws:\/\/|^wss:\/\/|^udp:\/\//i, '');
+            if (!clean) clean = "127.0.0.1:7777";
+            const parts = clean.split(':');
+            return {
+                host: parts[0] || "127.0.0.1",
+                port: parseInt(parts[1] || "7777", 10)
+            };
+        }
+
+        function connectToServer() {
+            const target = parseHostPort(serverIpInput.value);
+            udpHost = target.host;
+            udpPort = target.port;
+
+            // 1. Check if running in an environment with native Node UDP (Electron / NW.js)
+            if (typeof window.require === 'function') {
+                try {
+                    const dgram = window.require('dgram');
+                    if (udpSocket) udpSocket.close();
+                    udpSocket = dgram.createSocket('udp4');
+
+                    udpSocket.on('message', (msg) => {
+                        try {
+                            handleServerMessage(JSON.parse(msg.toString()));
+                        } catch (e) {}
+                    });
+
+                    udpSocket.on('error', (err) => {
+                        console.error("UDP error:", err);
+                    });
+
+                    isConnected = true;
+                    authStatus.innerText = `Connected via Native UDP to ${udpHost}:${udpPort}`;
+                    authStatus.className = "text-green-400 mb-6 font-mono text-sm";
+
+                    sendPacket({
+                        type: "join",
+                        id: userId,
+                        color: myColor,
+                        x: playerBody.position.x,
+                        y: playerBody.position.y,
+                        z: playerBody.position.z,
+                        yaw: yawObj.rotation.y
+                    });
+                    return;
+                } catch (e) {
+                    // Fallback to WebSocket on port 7777
+                }
+            }
+
+            // 2. Standard Browser Connection to Port 7777
+            const wsUrl = `ws://${udpHost}:${udpPort}`;
+            if (socket) socket.close();
+
+            authStatus.innerText = `Connecting to ${wsUrl}...`;
+            authStatus.className = "text-cyan-400 mb-6 font-mono text-sm animate-pulse";
+
+            try {
+                socket = new WebSocket(wsUrl);
+            } catch (err) {
+                authStatus.innerText = "Invalid Server Address.";
+                authStatus.className = "text-red-400 mb-6 font-mono text-sm";
+                return;
+            }
+
+            socket.onopen = () => {
+                isConnected = true;
+                authStatus.innerText = `Connected to Server (${udpHost}:${udpPort})`;
+                authStatus.className = "text-green-400 mb-6 font-mono text-sm";
+
+                sendPacket({
+                    type: "join",
+                    id: userId,
+                    color: myColor,
+                    x: playerBody.position.x,
+                    y: playerBody.position.y,
+                    z: playerBody.position.z,
+                    yaw: yawObj.rotation.y
+                });
+            };
+
+            socket.onmessage = (event) => {
+                try {
+                    handleServerMessage(JSON.parse(event.data));
+                } catch (e) {}
+            };
+
+            socket.onerror = () => {
+                authStatus.innerText = `Offline Mode Ready (Could not reach ${udpHost}:${udpPort})`;
+                authStatus.className = "text-amber-400 mb-6 font-mono text-sm";
+            };
+
+            socket.onclose = () => {
+                isConnected = false;
+                Object.keys(remotePlayers).forEach(removeRemotePlayer);
+            };
+        }
+
+        connectBtn.addEventListener('click', connectToServer);
+
+        function sendPacket(obj) {
+            const payload = JSON.stringify(obj);
+            if (udpSocket) {
+                const buf = Buffer.from(payload);
+                udpSocket.send(buf, 0, buf.length, udpPort, udpHost);
+            } else if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(payload);
+            }
+        }
+
+        function handleServerMessage(msg) {
+            if (!msg || !msg.type) return;
+
+            switch (msg.type) {
+                case "init":
+                    if (Array.isArray(msg.players)) {
+                        msg.players.forEach(p => {
+                            if (p.id !== userId) updateOrCreateRemotePlayer(p);
+                        });
+                    }
+                    if (Array.isArray(msg.props)) {
+                        msg.props.forEach(prop => {
+                            if (!activeProps[prop.id]) spawnLocalPropVisual(prop.id, prop);
+                        });
+                    }
+                    if (Array.isArray(msg.cars)) {
+                        msg.cars.forEach(c => {
+                            const car = createCarObject(c.id, c);
+                            applyRemoteCarState(car, c);
+                        });
+                    }
+                    break;
+
+                case "join":
+                case "playerUpdate":
+                    if (msg.id && msg.id !== userId) {
+                        updateOrCreateRemotePlayer(msg);
+                    }
+                    break;
+
+                case "playerLeave":
+                    removeRemotePlayer(msg.id);
+                    break;
+
+                case "playerHit":
+                    if (msg.targetId === userId) {
+                        if (drivingCar) toggleEnterExitCar();
+                        triggerLocalShatter();
+                    }
+                    break;
+
+                case "spawnProp":
+                    if (!activeProps[msg.id]) {
+                        spawnLocalPropVisual(msg.id, msg);
+                    }
+                    break;
+
+                case "impulseProp":
+                    const prop = activeProps[msg.id];
+                    if (prop) {
+                        prop.body.wakeUp();
+                        prop.body.applyImpulse(
+                            new CANNON.Vec3(msg.fx, msg.fy, msg.fz),
+                            new CANNON.Vec3(msg.px, msg.py, msg.pz)
+                        );
+                    }
+                    break;
+
+                case "spawnCar":
+                    createCarObject(msg.id, msg);
+                    break;
+
+                case "carUpdate":
+                    const car = createCarObject(msg.id, msg);
+                    if (drivingCar !== car) {
+                        applyRemoteCarState(car, msg);
+                    }
+                    break;
+
+                case "chat":
+                    appendChatMessage(msg.uid, msg.color, msg.text);
+                    break;
+            }
+        }
+
+        function applyRemoteCarState(car, data) {
+            car.driverId = data.driverId || null;
+            car.steerAngle = data.steerAngle || 0;
+            car.body.position.set(data.x, data.y, data.z);
+            if (data.vx !== undefined) {
+                car.body.velocity.set(data.vx, data.vy, data.vz);
+            }
+            if (data.qx !== undefined) {
+                car.body.quaternion.set(data.qx, data.qy, data.qz, data.qw);
+            }
+        }
+
+        function updateOrCreateRemotePlayer(data) {
+            if (!remotePlayers[data.id]) {
+                remotePlayers[data.id] = createRemotePlayer(data.id, data.color || '#ffffff');
+            }
+            const rp = remotePlayers[data.id];
+            rp.targetPos.set(data.x, data.y - playerRadius, data.z);
+            rp.targetRotY = data.yaw || 0;
+            rp.inCar = !!data.inCar;
+
+            // Hide player mesh if they are shattered, or position them in the car
+            if (data.isShattered && !rp.isShattered) triggerRemoteShatter(rp);
+            else if (!data.isShattered && rp.isShattered) recoverRemoteShatter(rp);
+        }
+
+        function removeRemotePlayer(id) {
+            if (remotePlayers[id]) {
+                scene.remove(remotePlayers[id].group);
+                const index = intersectableObjects.indexOf(remotePlayers[id].hitMesh);
+                if (index > -1) intersectableObjects.splice(index, 1);
+                delete remotePlayers[id];
+            }
+        }
+
+        // --- Synced Physics Props ---
+        function spawnLocalPropVisual(id, data) {
+            let mesh, shape;
+            const mat = new THREE.MeshStandardMaterial({ color: data.color, roughness: 0.4 });
+
+            if (data.propType === 'box') {
+                mesh = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), mat);
+                shape = new CANNON.Box(new CANNON.Vec3(1, 1, 1));
+            } else {
+                mesh = new THREE.Mesh(new THREE.SphereGeometry(1.2, 16, 16), mat);
+                shape = new CANNON.Sphere(1.2);
+            }
+
+            mesh.castShadow = true; mesh.receiveShadow = true;
+            mesh.position.set(data.x, data.y, data.z);
+            scene.add(mesh);
+            intersectableObjects.push(mesh);
+            mesh.userData = { isProp: true, id: id };
+
+            const body = new CANNON.Body({ mass: 2, material: physicsMaterial, linearDamping: 0.1, angularDamping: 0.1 });
+            body.addShape(shape);
+            body.position.copy(mesh.position);
+            world.addBody(body);
+
+            activeProps[id] = { mesh, body };
+        }
+
+        document.getElementById('spawnBoxBtn').addEventListener('click', () => requestSpawnProp('box'));
+        document.getElementById('spawnBallBtn').addEventListener('click', () => requestSpawnProp('ball'));
+
+        function requestSpawnProp(propType) {
+            const dir = new THREE.Vector3();
+            camera.getWorldDirection(dir);
+            const pos = new THREE.Vector3().copy(playerObj.position).addScaledVector(dir, 5);
+            pos.y += 2;
+
+            const propData = {
+                type: "spawnProp",
+                id: 'p_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+                propType: propType,
+                color: '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0'),
+                x: pos.x, y: pos.y, z: pos.z
+            };
+
+            spawnLocalPropVisual(propData.id, propData);
+            sendPacket(propData);
+        }
+
+        function syncPlayerState() {
+            if (!isPlaying || !isConnected) return;
+            const now = Date.now();
+            if (now - lastSyncTime < 45) return; // ~22Hz UDP/WS sync rate
+            lastSyncTime = now;
+
+            const pos = drivingCar ? drivingCar.body.position : playerBody.position;
+            sendPacket({
+                type: "playerUpdate",
+                id: userId,
+                x: pos.x,
+                y: pos.y + (drivingCar ? 1.0 : 0),
+                z: pos.z,
+                yaw: yawObj.rotation.y,
+                color: myColor,
+                isShattered: isShatteredLocal,
+                inCar: drivingCar ? drivingCar.id : null
+            });
+
+            if (drivingCar) {
+                sendCarState(drivingCar);
+            }
+        }
+
+        // --- Chat ---
+        function escapeHTML(str) {
+            return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag]));
+        }
+
+        function appendChatMessage(uid, color, text) {
+            const div = document.createElement('div');
+            div.className = 'chat-msg';
+            div.innerHTML = `<span style="color:${color}; font-weight:bold;">${escapeHTML(uid.substring(0, 6))}:</span> <span class="text-gray-200">${escapeHTML(text)}</span>`;
+            chatMessages.appendChild(div);
+            while (chatMessages.children.length > 25) {
+                chatMessages.removeChild(chatMessages.firstChild);
+            }
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function sendChat() {
+            const text = chatInput.value.trim();
+            if (!text) return;
+            appendChatMessage(userId, myColor, text);
+            if (isConnected) {
+                sendPacket({ type: "chat", uid: userId, color: myColor, text: text });
+            }
+            chatInput.value = '';
+        }
+        chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendChat(); });
+
+        // --- Raycast Shooting ---
+        const raycaster = new THREE.Raycaster();
+
+        function fireRaycast() {
+            if (!isPlaying || isShatteredLocal) return;
+
+            const flash = new THREE.PointLight(0xffff00, 2, 10);
+            flash.position.set(0, 0, -1);
+            pitchObj.add(flash);
+            setTimeout(() => pitchObj.remove(flash), 50);
+
+            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+            const hits = raycaster.intersectObjects(intersectableObjects, false);
+
+            if (hits.length > 0) {
+                const hit = hits[0];
+                const obj = hit.object;
+                createSpark(hit.point);
+
+                if (obj.userData.isProp) {
+                    const dir = new THREE.Vector3();
+                    camera.getWorldDirection(dir);
+                    const forceMag = 45;
+                    const impulsePacket = {
+                        type: "impulseProp",
+                        id: obj.userData.id,
+                        fx: dir.x * forceMag, fy: dir.y * forceMag, fz: dir.z * forceMag,
+                        px: hit.point.x, py: hit.point.y, pz: hit.point.z
+                    };
+
+                    if (activeProps[obj.userData.id]) {
+                        const prop = activeProps[obj.userData.id];
+                        prop.body.wakeUp();
+                        prop.body.applyImpulse(
+                            new CANNON.Vec3(impulsePacket.fx, impulsePacket.fy, impulsePacket.fz),
+                            new CANNON.Vec3(impulsePacket.px, impulsePacket.py, impulsePacket.pz)
+                        );
+                    }
+                    sendPacket(impulsePacket);
+                } else if (obj.userData.isCar) {
+                    const car = activeCars[obj.userData.id];
+                    if (car) {
+                        const dir = new THREE.Vector3();
+                        camera.getWorldDirection(dir);
+                        car.body.applyImpulse(
+                            new CANNON.Vec3(dir.x * 120, dir.y * 120, dir.z * 120),
+                            new CANNON.Vec3(hit.point.x, hit.point.y, hit.point.z)
+                        );
+                        sendCarState(car);
+                    }
+                } else if (obj.userData.isPlayer) {
+                    sendPacket({
+                        type: "playerHit",
+                        targetId: obj.userData.playerId
+                    });
+                }
+            }
+        }
+
+        function createSpark(pos) {
+            const mat = new THREE.MeshBasicMaterial({ color: 0xffffaa });
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), mat);
+            mesh.position.copy(pos);
+            scene.add(mesh);
+            setTimeout(() => scene.remove(mesh), 150);
+        }
+
+        // --- Entities & Shatter Mechanics ---
+        const shatterDebris = [];
+
+        function createRemotePlayer(id, colorHex) {
+            const group = new THREE.Group();
+            const mat = new THREE.MeshStandardMaterial({ color: colorHex });
+            const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.6, 1.2), mat);
+            body.position.y = 0.8; body.castShadow = true; group.add(body);
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.8), mat);
+            head.position.y = 2.0; head.castShadow = true; group.add(head);
+            const glasses = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.2, 0.2), new THREE.MeshBasicMaterial({ color: 0x000000 }));
+            glasses.position.set(0, 2.0, -0.4); group.add(glasses);
+
+            scene.add(group);
+
+            const hitMesh = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.6, 1.4), new THREE.MeshBasicMaterial({ visible: false }));
+            hitMesh.position.y = 1.3;
+            group.add(hitMesh);
+            hitMesh.userData = { isPlayer: true, playerId: id };
+            intersectableObjects.push(hitMesh);
+
+            return { group, hitMesh, targetPos: new THREE.Vector3(0, 10, 0), targetRotY: 0, isShattered: false, baseColor: colorHex, inCar: false };
+        }
+
+        function spawnPhysicalShatter(position, colorHex) {
+            const mat = new THREE.MeshStandardMaterial({ color: colorHex });
+            const geo = new THREE.BoxGeometry(0.4, 0.4, 0.4);
+            const shape = new CANNON.Box(new CANNON.Vec3(0.2, 0.2, 0.2));
+
+            for (let i = 0; i < 15; i++) {
+                const mesh = new THREE.Mesh(geo, mat);
+                scene.add(mesh);
+                const body = new CANNON.Body({ mass: 0.5, material: physicsMaterial });
+                body.addShape(shape);
+                body.position.set(position.x + (Math.random() - 0.5), position.y + 1 + Math.random(), position.z + (Math.random() - 0.5));
+                body.velocity.set((Math.random() - 0.5) * 15, 5 + Math.random() * 10, (Math.random() - 0.5) * 15);
+                world.addBody(body);
+                mesh.position.copy(body.position);
+                shatterDebris.push({ mesh, body, life: 3.0 });
+            }
+        }
+
+        function triggerLocalShatter() {
+            if (!ragdollEnabled || isShatteredLocal || !isPlaying) return;
+            isShatteredLocal = true;
+
+            pitchObj.position.set(0, -0.3, 0);
+            spawnPhysicalShatter(playerObj.position, myColor);
+            world.removeBody(playerBody);
+            syncPlayerState();
+
+            setTimeout(() => {
+                isShatteredLocal = false;
+                playerBody.position.set(0, 15, 8);
+                playerBody.velocity.set(0, 0, 0);
+                world.addBody(playerBody);
+                yawObj.rotation.y = 0;
+                pitchObj.rotation.x = 0;
+                pitchObj.position.set(0, 1.2, 0);
+                syncPlayerState();
+            }, 3000);
+        }
+
+        function triggerRemoteShatter(rp) {
+            rp.isShattered = true; rp.group.visible = false; rp.hitMesh.visible = false;
+            spawnPhysicalShatter(rp.group.position, rp.baseColor);
+        }
+
+        function recoverRemoteShatter(rp) {
+            rp.isShattered = false; rp.group.visible = true; rp.hitMesh.visible = true;
+        }
+
+        // --- Input & Controls ---
+        const keys = { w: false, a: false, s: false, d: false, space: false };
+        let mouseLocked = false;
+
+        document.addEventListener('mousemove', (e) => {
+            if (mouseLocked && isPlaying && !isShatteredLocal) {
+                yawObj.rotation.y -= (e.movementX || 0) * 0.002;
+                pitchObj.rotation.x -= (e.movementY || 0) * 0.002;
+                pitchObj.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitchObj.rotation.x));
+            }
+        });
+
+        document.addEventListener('mousedown', (e) => {
+            if (!isPlaying || isShatteredLocal || settingsModal.style.display === 'block' || e.target.closest('.ui-btn') || e.target.closest('#vehiclePrompt') || e.target.closest('#chatContainer') || e.target.closest('#mobileControls')) return;
+            if (!mouseLocked) document.body.requestPointerLock();
+            else if (e.button === 0) fireRaycast();
+        });
+
+        document.addEventListener('pointerlockchange', () => mouseLocked = document.pointerLockElement === document.body);
+
+        window.addEventListener('keydown', (e) => {
+            if (!isPlaying || isShatteredLocal) return;
+            if (e.key === 'Enter') {
+                if (document.activeElement === chatInput) {
+                    sendChat();
+                    chatInput.blur();
+                    if (window.innerWidth > 768 && settingsModal.style.display !== 'block') document.body.requestPointerLock();
+                } else {
+                    if (mouseLocked) document.exitPointerLock();
+                    chatInput.focus();
+                }
+                return;
+            }
+            if (document.activeElement === chatInput) return;
+
+            const k = e.key.toLowerCase();
+            if (k === 'e') {
+                toggleEnterExitCar();
+                return;
+            }
+            if (keys.hasOwnProperty(k)) keys[k] = true;
+            if (e.code === 'Space') {
+                keys.space = true;
+                tryJump();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            const k = e.key.toLowerCase();
+            if (keys.hasOwnProperty(k)) keys[k] = false;
+            if (e.code === 'Space') keys.space = false;
+        });
+
+        // Mobile Controls
+        let joyMove = { x: 0, y: 0 };
+        const leftZone = document.getElementById('joyLeft'), leftKnob = document.getElementById('knobLeft');
+        let leftTouchId = null, leftCenter = { x: 0, y: 0 };
+
+        leftZone.addEventListener('touchstart', (e) => {
+            if (leftTouchId !== null) return;
+            e.preventDefault();
+            const touch = e.changedTouches[0];
+            leftTouchId = touch.identifier;
+            const rect = leftZone.getBoundingClientRect();
+            leftCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+            updateJoystick(touch);
+        }, { passive: false });
+
+        leftZone.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            for (let t of e.changedTouches) if (t.identifier === leftTouchId) updateJoystick(t);
+        }, { passive: false });
+
+        const resetLeftJoy = (e) => {
+            for (let t of e.changedTouches) {
+                if (t.identifier === leftTouchId) {
+                    leftTouchId = null;
+                    leftKnob.style.transform = `translate(0px, 0px)`;
+                    joyMove = { x: 0, y: 0 };
+                }
+            }
+        };
+        leftZone.addEventListener('touchend', resetLeftJoy);
+        leftZone.addEventListener('touchcancel', resetLeftJoy);
+
+        function updateJoystick(t) {
+            let dx = t.clientX - leftCenter.x, dy = t.clientY - leftCenter.y;
+            const dist = Math.hypot(dx, dy), radius = 35;
+            if (dist > radius) { dx *= radius / dist; dy *= radius / dist; }
+            leftKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+            joyMove.x = dx / radius; joyMove.y = dy / radius;
+        }
+
+        const rightTouchZone = document.getElementById('rightTouchZone');
+        let lookTouchId = null, lastLookX = 0, lastLookY = 0;
+
+        rightTouchZone.addEventListener('touchstart', (e) => {
+            if (!isPlaying || isShatteredLocal || settingsModal.style.display === 'block') return;
+            e.preventDefault();
+            for (let t of e.changedTouches) if (lookTouchId === null) {
+                lookTouchId = t.identifier; lastLookX = t.clientX; lastLookY = t.clientY; break;
+            }
+        }, { passive: false });
+
+        rightTouchZone.addEventListener('touchmove', (e) => {
+            if (!isPlaying || isShatteredLocal) return;
+            e.preventDefault();
+            for (let t of e.changedTouches) {
+                if (t.identifier === lookTouchId) {
+                    yawObj.rotation.y -= (t.clientX - lastLookX) * 0.005;
+                    pitchObj.rotation.x -= (t.clientY - lastLookY) * 0.005;
+                    pitchObj.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitchObj.rotation.x));
+                    lastLookX = t.clientX; lastLookY = t.clientY;
+                }
+            }
+        }, { passive: false });
+
+        const endLook = (e) => { for (let t of e.changedTouches) if (t.identifier === lookTouchId) lookTouchId = null; };
+        rightTouchZone.addEventListener('touchend', endLook);
+        rightTouchZone.addEventListener('touchcancel', endLook);
+
+        document.getElementById('jumpBtnMobile').addEventListener('touchstart', (e) => { e.preventDefault(); tryJump(); }, { passive: false });
+        document.getElementById('shootBtnMobile').addEventListener('touchstart', (e) => { e.preventDefault(); if (!isShatteredLocal) fireRaycast(); }, { passive: false });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // --- Game Loop ---
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = Math.min(clock.getDelta(), 0.1);
+
+            if (jumpCooldown > 0) jumpCooldown -= dt;
+
+            world.step(1 / 60, dt, 3);
+
+            if (isPlaying && !isShatteredLocal) {
+                let throttle = 0, steer = 0;
+                if (document.activeElement !== chatInput) {
+                    if (keys.w) throttle += 1;
+                    if (keys.s) throttle -= 1;
+                    if (keys.a) steer += 1;
+                    if (keys.d) steer -= 1;
+                }
+                if (joyMove.x !== 0 || joyMove.y !== 0) {
+                    throttle = -joyMove.y;
+                    steer = -joyMove.x;
+                }
+
+                if (drivingCar) {
+                    // --- Driving Car Physics ---
+                    vehiclePrompt.classList.remove('hidden');
+                    vehiclePrompt.innerText = "Driving Car — Press [E] to Exit | Space to Brake";
+
+                    const carBody = drivingCar.body;
+
+                    // Keep car upright so it doesn't roll upside down easily
+                    const euler = new CANNON.Vec3();
+                    carBody.quaternion.toEuler(euler);
+                    carBody.quaternion.setFromEuler(euler.x * 0.85, euler.y, euler.z * 0.85);
+
+                    drivingCar.steerAngle = THREE.MathUtils.lerp(drivingCar.steerAngle, steer * 0.55, 10 * dt);
+
+                    // Forward direction of the car
+                    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(drivingCar.group.quaternion);
+                    forward.y = 0;
+                    forward.normalize();
+
+                    const currentVel = new THREE.Vector3(carBody.velocity.x, 0, carBody.velocity.z);
+                    const forwardSpeed = currentVel.dot(forward);
+
+                    if (keys.space) {
+                        // Handbrake
+                        carBody.velocity.x *= 0.88;
+                        carBody.velocity.z *= 0.88;
+                    } else if (throttle !== 0) {
+                        const maxSpeed = throttle > 0 ? 32 : 16;
+                        const accel = 42 * dt * throttle;
+                        const targetSpeed = THREE.MathUtils.clamp(forwardSpeed + accel, -maxSpeed, maxSpeed);
+                        carBody.velocity.x = forward.x * targetSpeed;
+                        carBody.velocity.z = forward.z * targetSpeed;
+                    } else {
+                        // Natural rolling deceleration
+                        carBody.velocity.x *= 0.97;
+                        carBody.velocity.z *= 0.97;
+                    }
+
+                    // Turn car yaw when moving
+                    if (Math.abs(forwardSpeed) > 0.5) {
+                        const dirSign = forwardSpeed >= 0 ? 1 : -1;
+                        const turnRate = drivingCar.steerAngle * dirSign * Math.min(Math.abs(forwardSpeed) / 10, 1.8);
+                        carBody.angularVelocity.y = turnRate * 2.4;
+                    } else {
+                        carBody.angularVelocity.y *= 0.5;
+                    }
+
+                    // Lock player camera rig onto the car
+                    playerObj.position.copy(carBody.position);
+                    syncPlayerState();
+                } else {
+                    // --- On-Foot Walking Physics ---
+                    if (keys.space) tryJump();
+
+                    if (playerBody.position.y < -30) {
+                        playerBody.position.set(0, 15, 8);
+                        playerBody.velocity.set(0, 0, 0);
+                    }
+
+                    const moveSpeed = 15;
+                    let mx = -steer, mz = -throttle;
+
+                    const moveVec = new THREE.Vector3(mx, 0, mz);
+                    if (moveVec.lengthSq() > 0) {
+                        moveVec.normalize().multiplyScalar(moveSpeed);
+                        moveVec.applyAxisAngle(new THREE.Vector3(0, 1, 0), yawObj.rotation.y);
+                    }
+
+                    playerBody.velocity.x = moveVec.x;
+                    playerBody.velocity.z = moveVec.z;
+
+                    playerObj.position.copy(playerBody.position);
+
+                    // Show prompt if near a car
+                    const nearCar = findNearestAvailableCar();
+                    if (nearCar) {
+                        vehiclePrompt.classList.remove('hidden');
+                        vehiclePrompt.innerText = "Press [E] to Enter Car 🚗";
+                    } else {
+                        vehiclePrompt.classList.add('hidden');
+                    }
+
+                    syncPlayerState();
+                }
+            }
+
+            // Update All Cars Visuals & Wheels
+            for (let id in activeCars) {
+                const car = activeCars[id];
+                if (car.body.position.y < -30) {
+                    car.body.position.set(0, 10, 12);
+                    car.body.velocity.set(0, 0, 0);
+                }
+                car.group.position.copy(car.body.position);
+                car.group.quaternion.copy(car.body.quaternion);
+
+                const speedMag = Math.hypot(car.body.velocity.x, car.body.velocity.z);
+                car.wheelSpin += speedMag * dt * 0.8;
+
+                car.wheels.forEach(w => {
+                    w.pivot.rotation.y = w.isFront ? car.steerAngle : 0;
+                    w.mesh.rotation.x = -car.wheelSpin;
+                });
+            }
+
+            // Update Props Visuals
+            for (let id in activeProps) {
+                const p = activeProps[id];
+                p.mesh.position.copy(p.body.position);
+                p.mesh.quaternion.copy(p.body.quaternion);
+            }
+
+            // Update Remote Players
+            for (let id in remotePlayers) {
+                const rp = remotePlayers[id];
+                if (!rp.isShattered) {
+                    rp.group.position.lerp(rp.targetPos, 0.25);
+                    const diff = rp.targetRotY - rp.group.rotation.y;
+                    rp.group.rotation.y += Math.atan2(Math.sin(diff), Math.cos(diff)) * 0.25;
+                }
+            }
+
+            // Debris Cleanup
+            for (let i = shatterDebris.length - 1; i >= 0; i--) {
+                const c = shatterDebris[i];
+                c.mesh.position.copy(c.body.position);
+                c.mesh.quaternion.copy(c.body.quaternion);
+                c.life -= dt;
+                if (c.life <= 0) {
+                    c.mesh.scale.multiplyScalar(0.9);
+                    if (c.mesh.scale.x < 0.05) {
+                        scene.remove(c.mesh);
+                        world.removeBody(c.body);
+                        shatterDebris.splice(i, 1);
+                    }
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // --- Start Button ---
+        playBtn.addEventListener('click', () => {
+            if (!isConnected) {
+                connectToServer();
+            }
+            startScreen.classList.add('hidden');
+            crosshair.classList.remove('hidden');
+            isPlaying = true;
+            if (window.innerWidth > 768) document.body.requestPointerLock();
+        });
+
+        animate();
+    </script>
 </body>
 </html>
