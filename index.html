@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -24,17 +24,17 @@
         /* Top Action Bar */
         #topBar {
             position: absolute; top: 20px; left: 20px; right: 20px;
-            display: flex; justify-content: space-between; z-index: 30; pointer-events: none;
+            display: flex; justify-content: space-between; align-items: center; z-index: 30; pointer-events: none;
         }
         .ui-btn {
-            background: rgba(0, 0, 0, 0.6); border: 2px solid rgba(0, 255, 255, 0.5); color: white;
-            padding: 8px 16px; border-radius: 8px; font-weight: bold; cursor: pointer; pointer-events: auto;
+            background: rgba(0, 0, 0, 0.65); border: 2px solid rgba(0, 255, 255, 0.5); color: white;
+            padding: 8px 14px; border-radius: 8px; font-weight: bold; cursor: pointer; pointer-events: auto;
             backdrop-filter: blur(4px); transition: all 0.2s; text-shadow: 1px 1px 2px black;
         }
         .ui-btn:hover { background: rgba(0, 255, 255, 0.2); transform: scale(1.05); }
         .ui-btn:active { transform: scale(0.95); }
 
-        #settingsBtn { font-size: 1.5rem; padding: 4px 12px; border-radius: 50%; border-color: rgba(255, 255, 255, 0.3); }
+        .icon-btn { font-size: 1.25rem; padding: 6px 12px; border-radius: 10px; border-color: rgba(255, 255, 255, 0.35); }
 
         /* Vehicle Prompt Banner */
         #vehiclePrompt {
@@ -48,11 +48,13 @@
         /* Settings Modal */
         #settingsModal {
             display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: rgba(10, 15, 30, 0.95); border: 2px solid #0ff; border-radius: 12px;
-            padding: 24px; z-index: 50; width: 300px; box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
-            pointer-events: auto; backdrop-filter: blur(10px);
+            background: rgba(10, 15, 30, 0.96); border: 2px solid #0ff; border-radius: 14px;
+            padding: 20px 24px; z-index: 50; width: 350px; max-width: 92vw; max-height: 85vh; overflow-y: auto;
+            box-shadow: 0 0 25px rgba(0, 255, 255, 0.3); pointer-events: auto; backdrop-filter: blur(12px);
         }
-        .modal-header { font-size: 1.25rem; font-weight: bold; margin-bottom: 16px; color: #0ff; border-bottom: 1px solid rgba(0,255,255,0.3); padding-bottom: 8px; }
+        .modal-header { font-size: 1.25rem; font-weight: bold; margin-bottom: 14px; color: #0ff; border-bottom: 1px solid rgba(0,255,255,0.3); padding-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+        .setting-row { margin-bottom: 12px; }
+        .setting-label { display: flex; justify-content: space-between; font-size: 0.85rem; color: #cbd5e1; margin-bottom: 4px; font-weight: 600; }
         
         /* Chat System */
         #chatContainer {
@@ -112,19 +114,19 @@
 <body>
 
     <!-- Start Screen -->
-    <div id="startScreen" class="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/90 backdrop-blur-sm no-select">
-        <h1 class="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-fuchsia-500 mb-2 drop-shadow-[0_0_15px_rgba(0,255,255,0.5)] text-center tracking-tighter">PHYSICS SANDBOX</h1>
-        <p class="text-xl text-fuchsia-300 mb-6 tracking-widest uppercase font-semibold">TCP Port 7777 + Drivable Cars</p>
+    <div id="startScreen" class="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/90 backdrop-blur-sm no-select px-4">
+        <h1 class="text-5xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-fuchsia-500 mb-2 drop-shadow-[0_0_15px_rgba(0,255,255,0.5)] text-center tracking-tighter">PHYSICS SANDBOX</h1>
+        <p class="text-lg md:text-xl text-fuchsia-300 mb-6 tracking-widest uppercase font-semibold text-center">Multiplayer + Drivable Cars</p>
         
-        <!-- Server IP Input (Defaults to 127.0.0.1:7777) -->
-        <div class="flex flex-col items-center gap-3 mb-6 w-80 pointer-events-auto">
-            <label for="serverIpInput" class="text-xs uppercase tracking-wider text-cyan-300 font-bold">Server IP & Port (TCP 7777)</label>
+        <!-- Server IP Input -->
+        <div class="flex flex-col items-center gap-3 mb-6 w-80 max-w-full pointer-events-auto">
+            <label for="serverIpInput" class="text-xs uppercase tracking-wider text-cyan-300 font-bold">Server IP / Render URL</label>
             <div class="flex w-full gap-2">
                 <input
                     id="serverIpInput"
                     type="text"
-                    value="127.0.0.1:7777"
-                    placeholder="127.0.0.1:7777"
+                    value="beamx.onrender.com"
+                    placeholder="beamx.onrender.com veya 127.0.0.1:7777"
                     class="flex-grow px-4 py-2 bg-black/70 border-2 border-cyan-500/60 rounded-lg text-white font-mono text-sm focus:outline-none focus:border-cyan-300"
                 />
                 <button id="connectBtn" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg text-sm transition-colors">
@@ -133,47 +135,125 @@
             </div>
         </div>
 
-        <p id="authStatus" class="text-gray-400 mb-6 font-mono text-sm">Enter Server IP and click Connect (or Play Offline)</p>
+        <p id="authStatus" class="text-gray-400 mb-6 font-mono text-sm text-center">Sunucu adresini girip Connect'e basın veya doğrudan başlatın</p>
 
-        <button id="playBtn" class="px-12 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold rounded-full text-2xl transition-transform hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(6,182,212,0.6)] pointer-events-auto border-2 border-cyan-300">
-            ENTER PLAYGROUND
-        </button>
+        <div class="flex flex-wrap gap-4 justify-center">
+            <button id="playBtn" class="px-10 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold rounded-full text-xl md:text-2xl transition-transform hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(6,182,212,0.6)] pointer-events-auto border-2 border-cyan-300">
+                ENTER PLAYGROUND
+            </button>
+            <button id="startFullscreenBtn" class="px-6 py-4 bg-gray-800 hover:bg-gray-700 text-cyan-300 font-bold rounded-full text-lg transition-transform hover:scale-105 active:scale-95 pointer-events-auto border-2 border-cyan-500/40">
+                ⛶ Tam Ekran
+            </button>
+        </div>
 
-        <p id="instructions" class="mt-10 text-gray-400 text-center max-w-lg bg-black/40 p-4 rounded-xl border border-gray-700">
-            <strong class="text-white">Desktop:</strong> Click to lock mouse. WASD to move/drive. Space to Jump/Brake.<br>
-            Press <strong class="text-cyan-400">[E]</strong> near a car to Enter or Exit the vehicle.<br>
-            Left Click to shoot (Raycast). Press ESC to unlock mouse.
+        <p id="instructions" class="mt-8 text-gray-400 text-center max-w-lg bg-black/40 p-4 rounded-xl border border-gray-700 text-sm">
+            <strong class="text-white">Masaüstü:</strong> Fareyi kilitlemek için tıklayın. WASD: Hareket / Sürüş. Space: Zıpla / Fren.<br>
+            Arabaya binmek veya inmek için <strong class="text-cyan-400">[E]</strong> tuşuna, tam ekran için <strong class="text-cyan-400">[F]</strong> tuşuna basın.<br>
+            Sol Tık: Ateş Et. ESC: Fare kilidini açar.
         </p>
     </div>
 
     <!-- UI Overlay -->
     <div id="topBar" class="no-select">
-        <div class="flex gap-3 flex-wrap">
-            <button id="spawnBoxBtn" class="ui-btn">Spawn Box</button>
-            <button id="spawnBallBtn" class="ui-btn">Spawn Ball</button>
-            <button id="spawnCarBtn" class="ui-btn border-fuchsia-400">Spawn Car 🚗</button>
+        <div class="flex gap-2 md:gap-3 flex-wrap">
+            <button id="spawnBoxBtn" class="ui-btn text-xs md:text-sm">Spawn Box</button>
+            <button id="spawnBallBtn" class="ui-btn text-xs md:text-sm">Spawn Ball</button>
+            <button id="spawnCarBtn" class="ui-btn border-fuchsia-400 text-xs md:text-sm">Spawn Car 🚗</button>
         </div>
-        <button id="settingsBtn" class="ui-btn">⚙️</button>
+        <div class="flex gap-2">
+            <button id="fullscreenBtn" class="ui-btn icon-btn" title="Tam Ekran (F)">⛶</button>
+            <button id="settingsBtn" class="ui-btn icon-btn" title="Ayarlar">⚙️</button>
+        </div>
     </div>
 
     <!-- Enter / Exit Car Prompt -->
     <div id="vehiclePrompt" class="hidden no-select">Press [E] to Enter Car</div>
 
-    <!-- Settings Modal -->
+    <!-- Expanded Settings Modal -->
     <div id="settingsModal" class="no-select">
-        <div class="modal-header">Settings</div>
-        <label class="flex items-center space-x-3 text-gray-200 cursor-pointer mb-6">
-            <input type="checkbox" id="ragdollToggle" checked class="w-5 h-5 accent-cyan-500 bg-gray-800 border-gray-600 rounded">
-            <span>Enable Ragdoll Mode (When Hit)</span>
+        <div class="modal-header">
+            <span>⚙️ Oyun Ayarları</span>
+            <span id="fpsCounter" class="text-xs font-mono text-emerald-400">60 FPS</span>
+        </div>
+
+        <!-- Oyuncu Rengi -->
+        <div class="setting-row flex items-center justify-between">
+            <span class="text-sm text-gray-200 font-semibold">Oyuncu Rengi</span>
+            <input type="color" id="playerColorPicker" class="w-10 h-8 rounded cursor-pointer bg-transparent border border-gray-600">
+        </div>
+
+        <!-- Hassasiyet (Sensitivity) -->
+        <div class="setting-row">
+            <div class="setting-label">
+                <span>Kamera Hassasiyeti</span>
+                <span id="sensVal">1.0x</span>
+            </div>
+            <input type="range" id="sensSlider" min="0.2" max="3.0" step="0.1" value="1.0" class="w-full accent-cyan-400 cursor-pointer">
+        </div>
+
+        <!-- Kamera Açısı (FOV) -->
+        <div class="setting-row">
+            <div class="setting-label">
+                <span>Görüş Açısı (FOV)</span>
+                <span id="fovVal">75°</span>
+            </div>
+            <input type="range" id="fovSlider" min="60" max="110" step="1" value="75" class="w-full accent-cyan-400 cursor-pointer">
+        </div>
+
+        <!-- Yerçekimi (Gravity) -->
+        <div class="setting-row">
+            <div class="setting-label">
+                <span>Yerçekimi (Gravity)</span>
+                <span id="gravVal">Normal (-25)</span>
+            </div>
+            <input type="range" id="gravSlider" min="5" max="50" step="1" value="25" class="w-full accent-fuchsia-400 cursor-pointer">
+        </div>
+
+        <!-- Sis Yoğunluğu (Fog) -->
+        <div class="setting-row">
+            <div class="setting-label">
+                <span>Sis Yoğunluğu</span>
+                <span id="fogVal">Normal</span>
+            </div>
+            <input type="range" id="fogSlider" min="0" max="0.03" step="0.002" value="0.012" class="w-full accent-cyan-400 cursor-pointer">
+        </div>
+
+        <!-- Checkbox Seçenekleri -->
+        <label class="flex items-center space-x-3 text-gray-200 cursor-pointer mb-3 text-sm">
+            <input type="checkbox" id="ragdollToggle" checked class="w-4 h-4 accent-cyan-500 bg-gray-800 border-gray-600 rounded">
+            <span>Vurulunca Parçalanma (Ragdoll)</span>
         </label>
-        <button id="closeSettingsBtn" class="w-full py-2 bg-gray-700 hover:bg-gray-600 text-white rounded font-bold transition-colors">Close</button>
+
+        <label class="flex items-center space-x-3 text-gray-200 cursor-pointer mb-3 text-sm">
+            <input type="checkbox" id="shadowsToggle" checked class="w-4 h-4 accent-cyan-500 bg-gray-800 border-gray-600 rounded">
+            <span>Gölgeleri Etkinleştir (Yüksek Kalite)</span>
+        </label>
+
+        <label class="flex items-center space-x-3 text-gray-200 cursor-pointer mb-4 text-sm">
+            <input type="checkbox" id="invertYToggle" class="w-4 h-4 accent-cyan-500 bg-gray-800 border-gray-600 rounded">
+            <span>Dikey Fare Ekseni Ters (Invert Y)</span>
+        </label>
+
+        <!-- Hızlı Aksiyon Butonları -->
+        <div class="grid grid-cols-2 gap-2 mb-3">
+            <button id="modalFullscreenBtn" class="py-2 bg-cyan-700 hover:bg-cyan-600 text-white rounded font-bold text-xs transition-colors">
+                ⛶ Tam Ekran
+            </button>
+            <button id="respawnBtn" class="py-2 bg-amber-600 hover:bg-amber-500 text-white rounded font-bold text-xs transition-colors">
+                🔄 Yeniden Doğ
+            </button>
+        </div>
+
+        <button id="closeSettingsBtn" class="w-full py-2 bg-gray-700 hover:bg-gray-600 text-white rounded font-bold transition-colors text-sm">
+            Kapat
+        </button>
     </div>
 
     <!-- Chat Overlay -->
     <div id="chatContainer" class="no-select">
         <div id="chatMessages"></div>
         <div id="chatInputContainer">
-            <input type="text" id="chatInput" placeholder="Press Enter to chat..." autocomplete="off" maxlength="100">
+            <input type="text" id="chatInput" placeholder="Sohbet için Enter'a basın..." autocomplete="off" maxlength="100">
         </div>
     </div>
 
@@ -189,10 +269,12 @@
     </div>
 
     <script>
-        // --- Game State & UI ---
+        // --- Game State & Settings Variables ---
         let isPlaying = false;
         let isShatteredLocal = false;
         let ragdollEnabled = true;
+        let lookSensitivity = 1.0;
+        let invertY = false;
         let userId = 'u_' + Math.random().toString(36).substring(2, 9);
         let myColor = '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
 
@@ -206,13 +288,27 @@
         const chatMessages = document.getElementById('chatMessages');
         const settingsModal = document.getElementById('settingsModal');
         const vehiclePrompt = document.getElementById('vehiclePrompt');
+        const playerColorPicker = document.getElementById('playerColorPicker');
+        playerColorPicker.value = myColor;
 
-        document.getElementById('ragdollToggle').addEventListener('change', (e) => { ragdollEnabled = e.target.checked; });
-        document.getElementById('settingsBtn').addEventListener('click', () => {
-            settingsModal.style.display = 'block';
-            if (document.pointerLockElement) document.exitPointerLock();
-        });
-        document.getElementById('closeSettingsBtn').addEventListener('click', () => { settingsModal.style.display = 'none'; });
+        // --- Fullscreen Support ---
+        function toggleFullscreen() {
+            const docEl = document.documentElement;
+            const isFs = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
+            if (!isFs) {
+                if (docEl.requestFullscreen) docEl.requestFullscreen().catch(() => {});
+                else if (docEl.webkitRequestFullscreen) docEl.webkitRequestFullscreen();
+                else if (docEl.msRequestFullscreen) docEl.msRequestFullscreen();
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
+                else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+                else if (document.msExitFullscreen) document.msExitFullscreen();
+            }
+        }
+
+        document.getElementById('fullscreenBtn').addEventListener('click', toggleFullscreen);
+        document.getElementById('startFullscreenBtn').addEventListener('click', toggleFullscreen);
+        document.getElementById('modalFullscreenBtn').addEventListener('click', toggleFullscreen);
 
         // --- Physics (Cannon.js) Setup ---
         const world = new CANNON.World();
@@ -258,6 +354,69 @@
         moonLight.shadow.camera.left = -120; moonLight.shadow.camera.right = 120;
         moonLight.shadow.camera.top = 120; moonLight.shadow.camera.bottom = -120;
         scene.add(moonLight);
+
+        // --- Settings Event Listeners ---
+        document.getElementById('settingsBtn').addEventListener('click', () => {
+            settingsModal.style.display = settingsModal.style.display === 'block' ? 'none' : 'block';
+            if (settingsModal.style.display === 'block' && document.pointerLockElement) {
+                document.exitPointerLock();
+            }
+        });
+        document.getElementById('closeSettingsBtn').addEventListener('click', () => {
+            settingsModal.style.display = 'none';
+        });
+
+        playerColorPicker.addEventListener('input', (e) => {
+            myColor = e.target.value;
+            syncPlayerState();
+        });
+
+        document.getElementById('sensSlider').addEventListener('input', (e) => {
+            lookSensitivity = parseFloat(e.target.value);
+            document.getElementById('sensVal').innerText = lookSensitivity.toFixed(1) + 'x';
+        });
+
+        document.getElementById('fovSlider').addEventListener('input', (e) => {
+            const fov = parseInt(e.target.value, 10);
+            camera.fov = fov;
+            camera.updateProjectionMatrix();
+            document.getElementById('fovVal').innerText = fov + '°';
+        });
+
+        document.getElementById('gravSlider').addEventListener('input', (e) => {
+            const g = parseInt(e.target.value, 10);
+            world.gravity.set(0, -g, 0);
+            document.getElementById('gravVal').innerText = `-${g}`;
+        });
+
+        document.getElementById('fogSlider').addEventListener('input', (e) => {
+            const density = parseFloat(e.target.value);
+            scene.fog.density = density;
+            document.getElementById('fogVal').innerText = density === 0 ? 'Kapalı' : density.toFixed(3);
+        });
+
+        document.getElementById('ragdollToggle').addEventListener('change', (e) => {
+            ragdollEnabled = e.target.checked;
+        });
+
+        document.getElementById('shadowsToggle').addEventListener('change', (e) => {
+            renderer.shadowMap.enabled = e.target.checked;
+            moonLight.castShadow = e.target.checked;
+            scene.traverse(obj => {
+                if (obj.material) obj.material.needsUpdate = true;
+            });
+        });
+
+        document.getElementById('invertYToggle').addEventListener('change', (e) => {
+            invertY = e.target.checked;
+        });
+
+        document.getElementById('respawnBtn').addEventListener('click', () => {
+            if (drivingCar) toggleEnterExitCar();
+            playerBody.position.set(0, 15, 8);
+            playerBody.velocity.set(0, 0, 0);
+            settingsModal.style.display = 'none';
+        });
 
         // --- Map Generator ---
         const intersectableObjects = [];
@@ -330,7 +489,7 @@
         }
         buildMap();
 
-        // --- Player Physics (Fixed Collision & Jumping) ---
+        // --- Player Physics ---
         const playerRadius = 0.8;
         const playerMass = 5;
         const playerBody = new CANNON.Body({
@@ -376,7 +535,6 @@
             const color = data.color || '#ff0055';
             const group = new THREE.Group();
 
-            // Main Chassis
             const chassisMat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.3, metalness: 0.6 });
             const chassisMesh = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.9, 4.8), chassisMat);
             chassisMesh.position.y = 0.75;
@@ -384,14 +542,12 @@
             chassisMesh.receiveShadow = true;
             group.add(chassisMesh);
 
-            // Cabin / Windshield
             const cabinMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.1, metalness: 0.9 });
             const cabinMesh = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.75, 2.4), cabinMat);
             cabinMesh.position.set(0, 1.5, -0.2);
             cabinMesh.castShadow = true;
             group.add(cabinMesh);
 
-            // Headlights & Taillights
             const headlightMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
             const taillightMat = new THREE.MeshBasicMaterial({ color: 0xff0044 });
             const frontStrip = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.15, 0.1), headlightMat);
@@ -402,7 +558,6 @@
             rearStrip.position.set(0, 0.8, 2.41);
             group.add(rearStrip);
 
-            // 4 Wheels
             const wheelGeo = new THREE.CylinderGeometry(0.55, 0.55, 0.45, 16);
             wheelGeo.rotateZ(Math.PI / 2);
             const wheelMat = new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.8 });
@@ -466,7 +621,6 @@
             return car;
         }
 
-        // Pre-spawn 2 default cars on the map
         createCarObject('car_default_1', { x: 14, y: 4, z: 12, color: '#00f5d4' });
         createCarObject('car_default_2', { x: -14, y: 4, z: 12, color: '#f72585' });
 
@@ -512,7 +666,6 @@
                 car.driverId = null;
                 drivingCar = null;
 
-                // Place player right outside the left driver door
                 const exitOffset = new THREE.Vector3(-2.6, 1.8, 0);
                 exitOffset.applyQuaternion(car.group.quaternion);
                 playerBody.position.set(
@@ -568,7 +721,7 @@
             });
         }
 
-        // --- Pure TCP WebSocket Networking (Port 7777) ---
+        // --- Smart WebSocket Networking (Auto WSS for Render / WS for Local) ---
         let socket = null;
         let isConnected = false;
         let remotePlayers = {};
@@ -577,9 +730,14 @@
 
         function formatWsUrl(rawInput) {
             let addr = rawInput.trim();
-            if (!addr) addr = "127.0.0.1:7777";
+            if (!addr) addr = "beamx.onrender.com";
+
             if (!addr.startsWith("ws://") && !addr.startsWith("wss://")) {
-                addr = "ws://" + addr;
+                const isLocal = addr.startsWith("127.0.0.1") || addr.startsWith("localhost") || addr.startsWith("192.168.");
+                const protocol = (!isLocal && (window.location.protocol === "https:" || addr.includes(".onrender.com") || addr.includes(".glitch.me")))
+                    ? "wss://"
+                    : "ws://";
+                addr = protocol + addr;
             }
             return addr;
         }
@@ -588,21 +746,21 @@
             const wsUrl = formatWsUrl(serverIpInput.value);
             if (socket) socket.close();
 
-            authStatus.innerText = `Connecting via TCP to ${wsUrl}...`;
-            authStatus.className = "text-cyan-400 mb-6 font-mono text-sm animate-pulse";
+            authStatus.innerText = `Bağlanılıyor: ${wsUrl} (Render uykudaysa 30sn sürebilir)...`;
+            authStatus.className = "text-cyan-400 mb-6 font-mono text-sm animate-pulse text-center";
 
             try {
                 socket = new WebSocket(wsUrl);
             } catch (err) {
-                authStatus.innerText = "Invalid Server IP format.";
-                authStatus.className = "text-red-400 mb-6 font-mono text-sm";
+                authStatus.innerText = "Geçersiz Sunucu Adresi.";
+                authStatus.className = "text-red-400 mb-6 font-mono text-sm text-center";
                 return;
             }
 
             socket.onopen = () => {
                 isConnected = true;
-                authStatus.innerText = `Connected via TCP (${wsUrl})`;
-                authStatus.className = "text-green-400 mb-6 font-mono text-sm";
+                authStatus.innerText = `Bağlandı! (${wsUrl})`;
+                authStatus.className = "text-green-400 mb-6 font-mono text-sm text-center";
 
                 sendPacket({
                     type: "join",
@@ -618,14 +776,12 @@
             socket.onmessage = (event) => {
                 try {
                     handleServerMessage(JSON.parse(event.data));
-                } catch (e) {
-                    console.error("Invalid packet:", e);
-                }
+                } catch (e) {}
             };
 
             socket.onerror = () => {
-                authStatus.innerText = `Offline Mode Ready (Could not reach ${wsUrl})`;
-                authStatus.className = "text-amber-400 mb-6 font-mono text-sm";
+                authStatus.innerText = `Çevrimdışı Mod Hazır (${wsUrl} adresine ulaşılamadı)`;
+                authStatus.className = "text-amber-400 mb-6 font-mono text-sm text-center";
             };
 
             socket.onclose = () => {
@@ -734,6 +890,11 @@
                 remotePlayers[data.id] = createRemotePlayer(data.id, data.color || '#ffffff');
             }
             const rp = remotePlayers[data.id];
+            if (data.color && data.color !== rp.baseColor) {
+                rp.baseColor = data.color;
+                rp.bodyMesh.material.color.set(data.color);
+                rp.headMesh.material.color.set(data.color);
+            }
             rp.targetPos.set(data.x, data.y - playerRadius, data.z);
             rp.targetRotY = data.yaw || 0;
 
@@ -806,7 +967,7 @@
         function syncPlayerState() {
             if (!isPlaying || !isConnected) return;
             const now = Date.now();
-            if (now - lastSyncTime < 50) return; // 20Hz sync rate
+            if (now - lastSyncTime < 50) return;
             lastSyncTime = now;
 
             const pos = drivingCar ? drivingCar.body.position : playerBody.position;
@@ -928,10 +1089,10 @@
         function createRemotePlayer(id, colorHex) {
             const group = new THREE.Group();
             const mat = new THREE.MeshStandardMaterial({ color: colorHex });
-            const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.6, 1.2), mat);
-            body.position.y = 0.8; body.castShadow = true; group.add(body);
-            const head = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.8), mat);
-            head.position.y = 2.0; head.castShadow = true; group.add(head);
+            const bodyMesh = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.6, 1.2), mat);
+            bodyMesh.position.y = 0.8; bodyMesh.castShadow = true; group.add(bodyMesh);
+            const headMesh = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.8), mat);
+            headMesh.position.y = 2.0; headMesh.castShadow = true; group.add(headMesh);
             const glasses = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.2, 0.2), new THREE.MeshBasicMaterial({ color: 0x000000 }));
             glasses.position.set(0, 2.0, -0.4); group.add(glasses);
 
@@ -943,7 +1104,7 @@
             hitMesh.userData = { isPlayer: true, playerId: id };
             intersectableObjects.push(hitMesh);
 
-            return { group, hitMesh, targetPos: new THREE.Vector3(0, 10, 0), targetRotY: 0, isShattered: false, baseColor: colorHex };
+            return { group, bodyMesh, headMesh, hitMesh, targetPos: new THREE.Vector3(0, 10, 0), targetRotY: 0, isShattered: false, baseColor: colorHex };
         }
 
         function spawnPhysicalShatter(position, colorHex) {
@@ -1000,8 +1161,9 @@
 
         document.addEventListener('mousemove', (e) => {
             if (mouseLocked && isPlaying && !isShatteredLocal) {
-                yawObj.rotation.y -= (e.movementX || 0) * 0.002;
-                pitchObj.rotation.x -= (e.movementY || 0) * 0.002;
+                const ySign = invertY ? 1 : -1;
+                yawObj.rotation.y -= (e.movementX || 0) * 0.002 * lookSensitivity;
+                pitchObj.rotation.x += (e.movementY || 0) * 0.002 * lookSensitivity * ySign;
                 pitchObj.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitchObj.rotation.x));
             }
         });
@@ -1032,6 +1194,10 @@
             const k = e.key.toLowerCase();
             if (k === 'e') {
                 toggleEnterExitCar();
+                return;
+            }
+            if (k === 'f') {
+                toggleFullscreen();
                 return;
             }
             if (keys.hasOwnProperty(k)) keys[k] = true;
@@ -1101,10 +1267,11 @@
         rightTouchZone.addEventListener('touchmove', (e) => {
             if (!isPlaying || isShatteredLocal) return;
             e.preventDefault();
+            const ySign = invertY ? 1 : -1;
             for (let t of e.changedTouches) {
                 if (t.identifier === lookTouchId) {
-                    yawObj.rotation.y -= (t.clientX - lastLookX) * 0.005;
-                    pitchObj.rotation.x -= (t.clientY - lastLookY) * 0.005;
+                    yawObj.rotation.y -= (t.clientX - lastLookX) * 0.005 * lookSensitivity;
+                    pitchObj.rotation.x += (t.clientY - lastLookY) * 0.005 * lookSensitivity * ySign;
                     pitchObj.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitchObj.rotation.x));
                     lastLookX = t.clientX; lastLookY = t.clientY;
                 }
@@ -1124,12 +1291,24 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        // --- Game Loop ---
+        // --- Game Loop & FPS Counter ---
         const clock = new THREE.Clock();
+        let frameCount = 0;
+        let fpsTimer = 0;
+        const fpsCounterEl = document.getElementById('fpsCounter');
 
         function animate() {
             requestAnimationFrame(animate);
-            const dt = Math.min(clock.getDelta(), 0.1);
+            const rawDt = clock.getDelta();
+            const dt = Math.min(rawDt, 0.1);
+
+            frameCount++;
+            fpsTimer += rawDt;
+            if (fpsTimer >= 0.5) {
+                fpsCounterEl.innerText = Math.round(frameCount / fpsTimer) + ' FPS';
+                frameCount = 0;
+                fpsTimer = 0;
+            }
 
             if (jumpCooldown > 0) jumpCooldown -= dt;
 
@@ -1149,13 +1328,11 @@
                 }
 
                 if (drivingCar) {
-                    // --- Driving Car Physics ---
                     vehiclePrompt.classList.remove('hidden');
-                    vehiclePrompt.innerText = "Driving Car — Press [E] to Exit | Space to Brake";
+                    vehiclePrompt.innerText = "Araç Sürülüyor — İnmek için [E] | Fren: Space";
 
                     const carBody = drivingCar.body;
 
-                    // Keep car stabilized upright
                     const euler = new CANNON.Vec3();
                     carBody.quaternion.toEuler(euler);
                     carBody.quaternion.setFromEuler(euler.x * 0.85, euler.y, euler.z * 0.85);
@@ -1194,7 +1371,6 @@
                     playerObj.position.copy(carBody.position);
                     syncPlayerState();
                 } else {
-                    // --- On-Foot Walking Physics ---
                     if (keys.space) tryJump();
 
                     if (playerBody.position.y < -30) {
@@ -1219,7 +1395,7 @@
                     const nearCar = findNearestAvailableCar();
                     if (nearCar) {
                         vehiclePrompt.classList.remove('hidden');
-                        vehiclePrompt.innerText = "Press [E] to Enter Car 🚗";
+                        vehiclePrompt.innerText = "Arabaya Binmek için [E] Tuşuna Basın 🚗";
                     } else {
                         vehiclePrompt.classList.add('hidden');
                     }
