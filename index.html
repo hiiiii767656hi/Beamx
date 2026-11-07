@@ -60,7 +60,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
 <body>
 <div id="startScreen" class="flex flex-col items-center justify-center bg-gray-950 no-select px-4 py-6">
   <h1 class="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-fuchsia-500 mb-1 text-center tracking-tighter">PHYSICS SANDBOX</h1>
-  <p class="text-sm md:text-base text-fuchsia-300 mb-4 tracking-widest uppercase font-semibold text-center">Yarı-Kesit Portallar (Split-Mesh) &amp; Nesne Geçişi 🛡️</p>
+  <p class="text-sm md:text-base text-fuchsia-300 mb-4 tracking-widest uppercase font-semibold text-center">Seamless (Kesintisiz) Portal Geçişi &amp; İkiz Kopya 🛡️</p>
 
   <div class="w-96 max-w-full bg-black/80 border-2 border-cyan-500/50 rounded-xl p-3.5 mb-3">
     <div class="flex items-center justify-between mb-2.5">
@@ -98,7 +98,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     <div id="savedServers" class="flex flex-wrap gap-2 w-full"></div>
   </div>
 
-  <p id="authStatus" class="text-gray-400 mb-4 font-mono text-xs text-center">Nesneleri ve kendinizi portalların yarısına sokup diğer taraftan çıkışını izleyebilirsiniz!</p>
+  <p id="authStatus" class="text-gray-400 mb-4 font-mono text-xs text-center">Portalların içinden sıfır sıçrama ile yürüyerek geçebilirsiniz!</p>
 
   <div class="flex flex-wrap gap-3 justify-center">
     <button id="playBtn" type="button" class="px-9 py-3.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold rounded-full text-lg border-2 border-cyan-300 shadow-[0_0_20px_rgba(6,182,212,0.5)] cursor-pointer">ENTER PLAYGROUND</button>
@@ -381,7 +381,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x050014);
   scene.fog = new THREE.FogExp2(0x050014, 0.006);
-  const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 1000);
+  const camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.05, 1000);
   const playerObj = new THREE.Object3D(), yawObj = new THREE.Object3D(), pitchObj = new THREE.Object3D();
   scene.add(playerObj); playerObj.add(yawObj); yawObj.add(pitchObj); pitchObj.add(camera);
   pitchObj.position.y = 1.25;
@@ -390,7 +390,6 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
   renderer.setPixelRatio(Math.min(devicePixelRatio, isTouch ? 1.5 : 2));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  // PORTAL YARI-KESİT (CLIPPING) AKTİF
   renderer.localClippingEnabled = true;
   _d.body.insertBefore(renderer.domElement, _d.body.firstChild);
   scene.add(new THREE.AmbientLight(0x505575, 0.75));
@@ -477,7 +476,6 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
 
   let localRig = buildRealisticHumanoid(myColor, mySkin);
   localRig.root.visible = false; scene.add(localRig.root);
-  // Oyuncu portalın yarısındayken karşı portaldan çıkan ikiz avatarı
   let localPortalCloneRig = buildRealisticHumanoid(myColor, mySkin);
   localPortalCloneRig.root.visible = false; scene.add(localPortalCloneRig.root);
 
@@ -698,31 +696,45 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
   }
   $('fingerModeBtn').addEventListener('click', (e) => { e.currentTarget.blur(); cycleFingerMode(); });
 
-  // ================= GERÇEK PORTAL SİSTEMİ: KAMERA + YARI-KESİT (CLIPPING) + NESNE GEÇİŞİ =================
+  // ================= SEAMLESS (KESİNTİSİZ) PORTAL SİSTEMİ =================
   let portalCooldown = 0;
-  const portalRes = isTouch ? 256 : 512;
+  const portalRes = isTouch ? 384 : 768;
 
   function makePortalSystem(hexColor) {
     const rt = new THREE.WebGLRenderTarget(portalRes, portalRes, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter });
-    const cam = new THREE.PerspectiveCamera(65, 0.85 / 1.35, 0.2, 600);
+    const cam = new THREE.PerspectiveCamera(camera.fov, camera.aspect, 0.05, 600);
     const g = new THREE.Group();
 
     const border = new THREE.Mesh(
-      new THREE.TorusGeometry(1.45, 0.15, 14, 36),
+      new THREE.TorusGeometry(1.45, 0.14, 16, 40),
       new THREE.MeshBasicMaterial({ color: hexColor })
     );
-    border.scale.set(0.85, 1.35, 1);
+    border.scale.set(0.88, 1.38, 1);
     g.add(border);
 
+    // Kamera tam portal yüzeyinden geçerken near-plane kırpılmasını önleyen 3B derinlikli iç yüzey
     const surfaceMat = new THREE.MeshBasicMaterial({ map: rt.texture, side: THREE.DoubleSide });
-    const inner = new THREE.Mesh(new THREE.CircleGeometry(1.39, 32), surfaceMat);
-    inner.scale.set(0.85, 1.35, 1);
+    const inner = new THREE.Mesh(new THREE.CircleGeometry(1.41, 36), surfaceMat);
+    inner.scale.set(0.88, 1.38, 1);
     g.add(inner);
+
+    const tunnel = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.41, 1.41, 0.45, 32, 1, true),
+      new THREE.MeshBasicMaterial({ color: hexColor, side: THREE.BackSide, transparent: true, opacity: 0.35 })
+    );
+    tunnel.rotation.x = Math.PI / 2;
+    tunnel.scale.set(0.88, 1.38, 1);
+    tunnel.position.z = -0.18;
+    g.add(tunnel);
 
     g.visible = false;
     scene.add(g);
     const clipPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
-    return { group: g, inner, surfaceMat, rt, cam, hexColor, clipPlane, active: false, pos: new THREE.Vector3(), normal: new THREE.Vector3(0, 0, 1) };
+    return {
+      group: g, inner, surfaceMat, rt, cam, hexColor, clipPlane,
+      active: false, pos: new THREE.Vector3(), normal: new THREE.Vector3(0, 0, 1),
+      prevPlayerSide: null
+    };
   }
 
   const bluePortal = makePortalSystem(0x38bdf8);
@@ -736,10 +748,10 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     p.group.up.copy(upVec);
     p.group.lookAt(p.pos.clone().add(p.normal));
     p.group.updateMatrixWorld();
-    // Portalın arkasında kalan nesne parçalarını kesen (clipping) düzlem
-    p.clipPlane.setFromNormalAndCoplanarPoint(p.normal, p.pos.clone().addScaledVector(p.normal, -0.05));
+    p.clipPlane.setFromNormalAndCoplanarPoint(p.normal, p.pos.clone().addScaledVector(p.normal, -0.02));
     p.group.visible = true;
     p.active = true;
+    p.prevPlayerSide = null;
   }
 
   function placePortal(isOrange) {
@@ -754,7 +766,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     spawnLaserBeam(startBeam, hit.point, isOrange ? 0xf97316 : 0x38bdf8);
     const p = isOrange ? orangePortal : bluePortal;
     const norm = hit.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize() : new THREE.Vector3(0, 1, 0);
-    const pos = hit.point.clone().addScaledVector(norm, 0.16);
+    const pos = hit.point.clone().addScaledVector(norm, 0.22);
     applyPortalTransform(p, pos.x, pos.y, pos.z, norm.x, norm.y, norm.z);
     if (isConnected) {
       sendPacket({ type: 'placePortal', isOrange, x: pos.x, y: pos.y, z: pos.z, nx: norm.x, ny: norm.y, nz: norm.z });
@@ -762,11 +774,9 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
   }
 
   const _pCamWorldPos = new THREE.Vector3();
-  const _pCamDir = new THREE.Vector3();
-  const _pLocalOffset = new THREE.Vector3();
+  const _pCamQuat = new THREE.Quaternion();
   const _pRotY180 = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
 
-  // Bir konum veya yönü kaynak portaldan hedef portala (180 derece dönüşle) dönüştürür
   function transformPointBetweenPortals(worldPt, srcP, dstP) {
     const rel = worldPt.clone().sub(srcP.pos);
     const srcInvQ = srcP.group.quaternion.clone().invert();
@@ -813,7 +823,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     }
 
     camera.getWorldPosition(_pCamWorldPos);
-    camera.getWorldDirection(_pCamDir);
+    camera.getWorldQuaternion(_pCamQuat);
 
     const prevFgVis = fingerGunGroup.visible;
     const prevGhostVis = ghostMesh.visible;
@@ -830,20 +840,26 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     localRig.root.visible = prevLocalRigVis;
   }
 
+  // BİREBİR PERSPEKTİF EŞLEŞTİRMELİ PORTAL KAMERASI: Geçiş anında sıfır görüntü kırılması sağlar
   function renderSinglePortalView(srcPortal, dstPortal) {
     srcPortal.group.updateMatrixWorld();
     dstPortal.group.updateMatrixWorld();
 
-    _pLocalOffset.copy(_pCamWorldPos).sub(srcPortal.pos);
-    const dist = Math.min(18, _pLocalOffset.length());
-    const worldOutDir = transformVecBetweenPortals(_pCamDir, srcPortal, dstPortal).normalize();
-
     const pCam = srcPortal.cam;
-    pCam.position.copy(dstPortal.pos).addScaledVector(dstPortal.normal, 0.35);
-    pCam.up.copy(dstPortal.group.up);
-    pCam.lookAt(pCam.position.clone().add(worldOutDir).addScaledVector(dstPortal.normal, 0.2));
-    pCam.fov = THREE.MathUtils.clamp(75 - dist * 0.6, 50, 80);
+    const virtualPos = transformPointBetweenPortals(_pCamWorldPos, srcPortal, dstPortal);
+    const virtualQuat = transformQuatBetweenPortals(_pCamQuat, srcPortal, dstPortal);
+
+    // Kameranın hedef portalın hemen önünden itibaren kesintisiz görmesini sağlar
+    const distToSrc = Math.max(0.05, _pCamWorldPos.distanceTo(srcPortal.pos));
+    pCam.position.copy(virtualPos);
+    pCam.quaternion.copy(virtualQuat);
+    pCam.fov = camera.fov;
+    pCam.aspect = 0.88 / 1.38;
+    pCam.near = Math.max(0.04, Math.min(0.4, distToSrc * 0.25));
     pCam.updateProjectionMatrix();
+
+    const prevClips = renderer.clippingPlanes;
+    renderer.clippingPlanes = [dstPortal.clipPlane];
 
     srcPortal.inner.visible = false;
     dstPortal.group.visible = false;
@@ -853,6 +869,8 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     renderer.setRenderTarget(null);
     srcPortal.inner.visible = true;
     dstPortal.group.visible = true;
+
+    renderer.clippingPlanes = prevClips;
   }
 
   function spawnLaserBeam(startWorld, endWorld, colorHex) {
@@ -1317,7 +1335,6 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     if (d.qx !== undefined) mesh.quaternion.set(d.qx, d.qy, d.qz, d.qw);
     mesh.userData = { isProp: true, id }; scene.add(mesh); intersectableObjects.push(mesh);
 
-    // Dinamik nesneler portalın yarısındayken karşı portaldan çıkan ikiz kopyası (portalClone)
     let portalClone = null;
     if (!isStatic) {
       portalClone = new THREE.Mesh(propGeo(type), mat.clone());
@@ -1340,7 +1357,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     syncBodyAABB(body); world.addBody(body);
 
     const boundR = t.s === 'ball' ? t.r : Math.max(t.h[0], t.h[1], t.h[2]);
-    const p = { id, propType: type, mesh, portalClone, boundR, body, isStatic, portalCd: 0 };
+    const p = { id, propType: type, mesh, portalClone, boundR, body, isStatic, portalCd: 0, prevSide: null };
     activeProps[id] = p; return p;
   }
 
@@ -1539,7 +1556,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
           p.body.position.set(msg.x, msg.y, msg.z);
           if (msg.vx !== undefined) p.body.velocity.set(msg.vx, msg.vy, msg.vz);
           if (msg.qx !== undefined) p.body.quaternion.set(msg.qx, msg.qy, msg.qz, msg.qw);
-          p.portalCd = 0.6;
+          p.portalCd = 0.25;
         }
         break;
       }
@@ -1958,32 +1975,44 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
   const clock = new THREE.Clock();
   let frames = 0, fpsTimer = 0;
 
-  // Oyuncu portaldan geçtiğinde hızını ve bakış açısını hedef portala aktarır
-  function teleportPlayerThroughPortal(srcPortal, dstPortal) {
-    const out = dstPortal.pos.clone().addScaledVector(dstPortal.normal, 1.45);
-    playerBody.position.set(out.x, out.y + 0.3, out.z);
-    const spd = Math.max(11, Math.hypot(playerBody.velocity.x, playerBody.velocity.y, playerBody.velocity.z));
-    playerBody.velocity.set(
-      dstPortal.normal.x * spd * 0.9,
-      Math.max(4.5, dstPortal.normal.y * spd * 0.9),
-      dstPortal.normal.z * spd * 0.9
-    );
-    if (Math.hypot(dstPortal.normal.x, dstPortal.normal.z) > 0.2) {
-      yawObj.rotation.y = Math.atan2(-dstPortal.normal.x, -dstPortal.normal.z);
+  // SIFIR SIÇRAMALI (SEAMLESS) OYUNCU PORTAL GEÇİŞİ:
+  // Oyuncunun portal merkezine olan yerel (X, Y, Z) ofsetini, kamera açısını ve hız vektörünü birebir dönüştürür.
+  function seamlessTeleportPlayer(srcPortal, dstPortal) {
+    const curPos = new THREE.Vector3(playerBody.position.x, playerBody.position.y, playerBody.position.z);
+    const newPos = transformPointBetweenPortals(curPos, srcPortal, dstPortal);
+    // Duvar içine sıkışmayı önlemek için hedef portal normali yönünde yalnızca çok ince (0.35m) güvenli pay
+    newPos.addScaledVector(dstPortal.normal, 0.35);
+    playerBody.position.set(newPos.x, newPos.y, newPos.z);
+    playerObj.position.copy(playerBody.position);
+
+    // Hız vektörünü kaynak portaldan hedef portala kesintisiz döndür
+    const curVel = new THREE.Vector3(playerBody.velocity.x, playerBody.velocity.y, playerBody.velocity.z);
+    const outVel = transformVecBetweenPortals(curVel, srcPortal, dstPortal);
+    playerBody.velocity.set(outVel.x, outVel.y, outVel.z);
+
+    // Bakış açısını (Yaw) portal kamerasının gösterdiği açıyla birebir eşleştir (kamera sıçramasını sıfırlar)
+    const lookDir = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), yawObj.rotation.y);
+    const newLookDir = transformVecBetweenPortals(lookDir, srcPortal, dstPortal);
+    if (Math.hypot(newLookDir.x, newLookDir.z) > 0.01) {
+      yawObj.rotation.y = Math.atan2(-newLookDir.x, -newLookDir.z);
     }
-    portalCooldown = 0.55;
+
+    bluePortal.prevPlayerSide = null;
+    orangePortal.prevPlayerSide = null;
+    portalCooldown = 0.22;
     syncPlayerState(true);
   }
 
-  // Dinamik nesneler (kutu, top, varil vb.) portaldan geçtiğinde hız ve açılarını koruyarak diğer portaldan çıkarır
-  function teleportPropThroughPortal(p, srcPortal, dstPortal) {
+  // SIFIR SIÇRAMALI NESNE PORTAL GEÇİŞİ
+  function seamlessTeleportProp(p, srcPortal, dstPortal) {
     if (grabbedProp === p) grabbedProp = null;
     const b = p.body;
-    const outPos = dstPortal.pos.clone().addScaledVector(dstPortal.normal, p.boundR + 0.55);
+    const curPos = new THREE.Vector3(b.position.x, b.position.y, b.position.z);
+    const outPos = transformPointBetweenPortals(curPos, srcPortal, dstPortal).addScaledVector(dstPortal.normal, 0.45);
+
     const inVel = new THREE.Vector3(b.velocity.x, b.velocity.y, b.velocity.z);
-    const spd = Math.max(10, inVel.length());
-    const outVel = dstPortal.normal.clone().multiplyScalar(spd * 0.95);
-    if (outVel.y < 3) outVel.y += 3;
+    const outVel = transformVecBetweenPortals(inVel, srcPortal, dstPortal);
+    if (outVel.lengthSq() < 16) outVel.addScaledVector(dstPortal.normal, 5);
 
     const curQ = new THREE.Quaternion(b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w);
     const outQ = transformQuatBetweenPortals(curQ, srcPortal, dstPortal);
@@ -1992,7 +2021,10 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     b.position.set(outPos.x, outPos.y, outPos.z);
     b.velocity.set(outVel.x, outVel.y, outVel.z);
     b.quaternion.set(outQ.x, outQ.y, outQ.z, outQ.w);
-    p.portalCd = 0.55;
+    p.mesh.position.copy(b.position);
+    p.mesh.quaternion.copy(b.quaternion);
+    p.portalCd = 0.25;
+    p.prevSide = null;
 
     if (isConnected) {
       sendPacket({
@@ -2104,7 +2136,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
         localRig.root.rotation.y = yawObj.rotation.y;
         animateHumanoidRig(localRig, moveSpd, dt, true);
 
-        // OYUNCU PORTAL YARI-KESİT (SPLIT-MESH) & GEÇİŞ KONTROLÜ
+        // KESİNTİSİZ (SEAMLESS) OYUNCU PORTAL GEÇİŞ KONTROLÜ
         localPortalCloneRig.root.visible = false;
         setGroupClippingPlane(localRig.root, []);
 
@@ -2119,20 +2151,29 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
           if (minDist < 2.2) {
             const relVec = pPos.clone().sub(nearP.pos);
             const normalDist = relVec.dot(nearP.normal);
+            const velVec = new THREE.Vector3(playerBody.velocity.x, playerBody.velocity.y, playerBody.velocity.z);
+            const movingIntoPortal = velVec.dot(nearP.normal) < -0.15;
 
-            // Oyuncu portal ağzına yarı yarıya girdiğinde: duvar arkasını kes ve karşı portalda yarısını göster
             setGroupClippingPlane(localRig.root, [nearP.clipPlane]);
             setGroupClippingPlane(localPortalCloneRig.root, [farP.clipPlane]);
 
             const cloneFootPos = transformPointBetweenPortals(localRig.root.position, nearP, farP);
             localPortalCloneRig.root.position.copy(cloneFootPos);
-            localPortalCloneRig.root.rotation.y = yawObj.rotation.y + Math.PI;
+            const lookDir = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), yawObj.rotation.y);
+            const outLook = transformVecBetweenPortals(lookDir, nearP, farP);
+            localPortalCloneRig.root.rotation.y = Math.atan2(-outLook.x, -outLook.z);
             animateHumanoidRig(localPortalCloneRig, moveSpd, dt, true);
             localPortalCloneRig.root.visible = true;
 
-            if (normalDist < 0.72 && portalCooldown <= 0) {
-              teleportPlayerThroughPortal(nearP, farP);
+            // Sadece oyuncu portal düzleminin tam merkezine (0.28m) ulaştığında ve portala doğru yürüyorsa kesintisiz aktar
+            if (normalDist <= 0.28 && (nearP.prevPlayerSide === null || nearP.prevPlayerSide > 0.28 || movingIntoPortal) && portalCooldown <= 0) {
+              seamlessTeleportPlayer(nearP, farP);
+            } else {
+              nearP.prevPlayerSide = normalDist;
             }
+          } else {
+            bluePortal.prevPlayerSide = null;
+            orangePortal.prevPlayerSide = null;
           }
         }
 
@@ -2170,7 +2211,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
       c.group.position.copy(c.body.position); c.group.quaternion.copy(c.body.quaternion);
     }
 
-    // NESNELERİN PORTALLARDAN GEÇİŞİ VE YARI-KESİT (SPLIT-MESH) KONTROLÜ
+    // NESNELERİN KESİNTİSİZ (SEAMLESS) PORTAL GEÇİŞİ VE YARI-KESİT KONTROLÜ
     for (const id in activeProps) {
       const p = activeProps[id]; if (p.isStatic) continue;
       if (p.portalCd > 0) p.portalCd -= dt;
@@ -2195,12 +2236,10 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
         const dstP = dB < dO ? orangePortal : bluePortal;
         const dist = Math.min(dB, dO);
 
-        // Nesne portala yaklaştığında / yarısı içindeyken
         if (dist < p.boundR + 1.45) {
           const rel = pos.clone().sub(srcP.pos);
           const normalDist = rel.dot(srcP.normal);
 
-          // Nesnenin duvar arkasına geçen kısmını kes ve karşı portaldan çıkan yarısını çiz
           p.mesh.material.clippingPlanes = [srcP.clipPlane];
           if (p.portalClone) {
             p.portalClone.material.clippingPlanes = [dstP.clipPlane];
@@ -2209,10 +2248,14 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
             p.portalClone.visible = true;
           }
 
-          // Nesnenin merkezi portal düzlemini geçtiyse tamamen karşı portala ışınla
-          if (normalDist < 0.65 && p.portalCd <= 0) {
-            teleportPropThroughPortal(p, srcP, dstP);
+          // Nesnenin merkezi tam portal yüzeyine (0.25m) ulaştığında diğer tarafa kesintisiz aktar
+          if (normalDist <= 0.25 && p.portalCd <= 0) {
+            seamlessTeleportProp(p, srcP, dstP);
+          } else {
+            p.prevSide = normalDist;
           }
+        } else {
+          p.prevSide = null;
         }
       }
     }
