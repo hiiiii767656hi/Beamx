@@ -60,7 +60,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
 <body>
 <div id="startScreen" class="flex flex-col items-center justify-center bg-gray-950 no-select px-4 py-6">
   <h1 class="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-fuchsia-500 mb-1 text-center tracking-tighter">PHYSICS SANDBOX</h1>
-  <p class="text-sm md:text-base text-fuchsia-300 mb-4 tracking-widest uppercase font-semibold text-center">Mavi &amp; Turuncu Portal Düzeltilmiş Sürüm 🛡️</p>
+  <p class="text-sm md:text-base text-fuchsia-300 mb-4 tracking-widest uppercase font-semibold text-center">Araba &amp; Ragdoll Portal Geçişi + Portal Boyut Ayarı 🛡️</p>
 
   <div class="w-96 max-w-full bg-black/80 border-2 border-cyan-500/50 rounded-xl p-3.5 mb-3">
     <div class="flex items-center justify-between mb-2.5">
@@ -98,7 +98,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     <div id="savedServers" class="flex flex-wrap gap-2 w-full"></div>
   </div>
 
-  <p id="authStatus" class="text-gray-400 mb-4 font-mono text-xs text-center">Sol Tık = Mavi Portal | Sağ Tık (veya Q) = Turuncu Portal!</p>
+  <p id="authStatus" class="text-gray-400 mb-4 font-mono text-xs text-center">Portal Gun elinizdeyken Fare Tekerleği ile portal boyutunu büyütüp araba ve ragdoll geçirebilirsiniz!</p>
 
   <div class="flex flex-wrap gap-3 justify-center">
     <button id="playBtn" type="button" class="px-9 py-3.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold rounded-full text-lg border-2 border-cyan-300 shadow-[0_0_20px_rgba(6,182,212,0.5)] cursor-pointer">ENTER PLAYGROUND</button>
@@ -111,6 +111,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     <button id="buildBtn" type="button" class="ui-btn text-xs" style="border-color:#34d399">🧱 Objeler (B)</button>
     <button id="randomPropBtn" type="button" class="ui-btn text-xs" style="border-color:#f43f5e">🎲 Rastgele (G)</button>
     <button id="fingerModeBtn" type="button" class="ui-btn text-xs" style="border-color:#38bdf8">🌀 Mod: Portal (V)</button>
+    <button id="portalSizeBtn" type="button" class="ui-btn text-xs" style="border-color:#f97316" title="Tıkla veya Fare Tekerleğini Çevir">📏 Portal: 1.5x</button>
     <button id="camViewBtn" type="button" class="ui-btn text-xs" style="border-color:#38bdf8">🎥 Kamera (C)</button>
     <button id="spawnCarBtn" type="button" class="ui-btn text-xs" style="border-color:#e879f9">Araba 🚗</button>
     <button id="ragdollBtn" type="button" class="ui-btn text-xs" style="border-color:#a855f7">Ragdoll (R)</button>
@@ -138,7 +139,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
 
 <div id="vehiclePrompt" class="hidden no-select"></div>
 <div id="hudBar" class="no-select">
-  Kimlik: <b id="hudUserName" class="text-cyan-300">Anonim</b> · Kostüm: <b id="hudSkinName" class="text-fuchsia-300">Klasik</b> · Silah: <b id="hudWeaponName" class="text-amber-300">🌀 Portal Gun (Sol: Mavi | Sağ/Q: Turuncu)</b> · Seçili: <b id="hudSelectedObj" class="text-emerald-300">📐 Rampa</b>
+  Kimlik: <b id="hudUserName" class="text-cyan-300">Anonim</b> · Boyut: <b id="hudPortalScale" class="text-orange-300">1.5x (Tekerlek)</b> · Silah: <b id="hudWeaponName" class="text-amber-300">🌀 Portal Gun</b> · Seçili: <b id="hudSelectedObj" class="text-emerald-300">📐 Rampa</b>
 </div>
 
 <div id="adminModal" class="no-select">
@@ -183,6 +184,10 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
       <option value="ninja">🥷 Neon Ninja (Gökdelenler)</option>
       <option value="soldier">🪖 Taktik Asker (Yarış Pisti)</option>
     </select>
+  </div>
+  <div class="setting-row">
+    <div class="setting-label"><span>📏 Portal Büyüklüğü (Tekerlek ile de değişir)</span><span id="portalScaleVal">1.5x</span></div>
+    <input type="range" id="portalScaleSlider" min="0.5" max="4.0" step="0.1" value="1.5" class="w-full accent-orange-400">
   </div>
   <div class="setting-row"><div class="setting-label"><span>Kamera Hassasiyeti</span><span id="sensVal">1.0x</span></div><input type="range" id="sensSlider" min="0.2" max="3" step="0.1" value="1" class="w-full accent-cyan-400"></div>
   <div class="setting-row"><div class="setting-label"><span>Görüş Açısı (FOV)</span><span id="fovVal">75°</span></div><input type="range" id="fovSlider" min="60" max="110" step="1" value="75" class="w-full accent-cyan-400"></div>
@@ -280,6 +285,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
   const isTouch = matchMedia('(pointer:coarse)').matches;
   let isPlaying = false, isShatteredLocal = false, ragdollEnabled = true, showGhost = true, showFingerGun = true, lookSensitivity = 1, invertY = false, thirdPerson = false;
   let mySkin = 'default';
+  let currentPortalScale = 1.5; // Varsayılan olarak araba ve ragdoll'un rahat geçebileceği 1.5x boyut
   const isHex = (s) => typeof s === 'string' && /^#[0-9a-f]{6}$/i.test(s);
   const randHex = () => '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
   let myColor = randHex();
@@ -488,7 +494,6 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     localPortalCloneRig.root.visible = false;
     scene.add(localRig.root);
     scene.add(localPortalCloneRig.root);
-    $('hudSkinName').textContent = (SKIN_PRESETS[mySkin] || SKIN_PRESETS.default).label;
   }
 
   function toggleCameraView() {
@@ -737,9 +742,9 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     const B = [];
     B.push([0, 0, 0, 20, 2, 20, 0x333333, false]);
     B.push([0, 2, 0, 10, 8, 10, 0x00ffff, true]);
-    // Başlangıç Meydanına Test İçin 2 Adet Portal Duvarı
-    B.push([-9, 2, -6, 1.2, 6, 8, 0x334155, false]);
-    B.push([9, 2, -6, 1.2, 6, 8, 0x334155, false]);
+    // Başlangıç Meydanına Test İçin 2 Adet Geniş Portal Duvarı
+    B.push([-9, 2, -6, 1.2, 8, 10, 0x334155, false]);
+    B.push([9, 2, -6, 1.2, 8, 10, 0x334155, false]);
     let px = 20, py = 2, pz = 0;
     const off = [-3, 4, -2, 5, -4, 3, -2, 1];
     for (let i = 0; i < 8; i++) { B.push([px, py, pz, 4, 1, 4, 0xff00ff, true]); px += 6; py += 2.5; pz += off[i]; }
@@ -785,7 +790,6 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     B.forEach((b) => addStaticBlock(b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8]));
   })();
 
-  // Portalın açıldığı noktadaki duvar gövdesini otomatik bulur (mavi veya turuncu fark etmeksizin)
   function findClosestWallBody(pos, norm, wallIdx = -1, propId = null) {
     if (wallIdx >= 0 && staticMapEntries[wallIdx] && !staticMapEntries[wallIdx].isFloor) {
       return staticMapEntries[wallIdx].body;
@@ -793,7 +797,6 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     if (propId && activeProps[propId]) {
       return activeProps[propId].body;
     }
-    // Eğer wallIdx gelmediyse (örn. sunucu init paketi), portalın hemen arkasındaki nesneyi raycast ile bul
     const probeStart = pos.clone().addScaledVector(norm, 0.35);
     const probeDir = norm.clone().negate();
     const rc = new THREE.Raycaster(probeStart, probeDir, 0, 1.5);
@@ -807,7 +810,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     return null;
   }
 
-  // ================= DÜZELTİLMİŞ MAVİ & TURUNCU PORTAL SİSTEMİ =================
+  // ================= ÖLÇEKLENEBİLİR (BOYUT AYARLI) MAVİ & TURUNCU PORTAL SİSTEMİ =================
   let portalCooldown = 0;
   const portalRes = isTouch ? 512 : 1024;
 
@@ -877,7 +880,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     return {
       isOrange: isOrangeFlag,
       group: g, inner, surfaceMat, rt, cam, hexColor, clipPlane,
-      active: false, pos: new THREE.Vector3(), normal: new THREE.Vector3(0, 0, 1),
+      active: false, scale: 1.5, pos: new THREE.Vector3(), normal: new THREE.Vector3(0, 0, 1),
       wallBody: null, wallIdx: -1
     };
   }
@@ -885,13 +888,47 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
   const bluePortal = makePortalSystem(0x38bdf8, false);
   const orangePortal = makePortalSystem(0xf97316, true);
 
-  function applyPortalTransform(p, px, py, pz, nx, ny, nz, wallIdx = -1, propId = null) {
-    // Eski duvarın çarpışmasını geri aç
+  function setPortalScaleValue(newScale, broadcastChange = true) {
+    currentPortalScale = Math.max(0.5, Math.min(4.0, Math.round(newScale * 10) / 10));
+    const lbl = currentPortalScale.toFixed(1) + 'x';
+    $('portalSizeBtn').textContent = `📏 Portal: ${lbl}`;
+    $('hudPortalScale').textContent = `${lbl} (Tekerlek)`;
+    $('portalScaleVal').textContent = lbl;
+    $('portalScaleSlider').value = currentPortalScale;
+
+    [bluePortal, orangePortal].forEach((p) => {
+      p.scale = currentPortalScale;
+      p.group.scale.set(currentPortalScale, currentPortalScale, currentPortalScale);
+      p.group.updateMatrixWorld();
+    });
+
+    if (broadcastChange && isConnected) {
+      sendPacket({ type: 'portalScale', scale: currentPortalScale });
+    }
+  }
+
+  $('portalSizeBtn').addEventListener('click', (e) => {
+    e.currentTarget.blur();
+    const presets = [1.0, 1.5, 2.2, 3.0, 4.0, 0.7];
+    const next = presets[(presets.indexOf(currentPortalScale) + 1) % presets.length] || 1.5;
+    setPortalScaleValue(next, true);
+  });
+  $('portalScaleSlider').addEventListener('input', (e) => {
+    setPortalScaleValue(parseFloat(e.target.value), true);
+  });
+
+  function applyPortalTransform(p, px, py, pz, nx, ny, nz, wallIdx = -1, propId = null, customScale = null) {
     if (p.wallBody) p.wallBody.collisionResponse = true;
+    if (customScale !== null && customScale !== undefined) {
+      p.scale = Math.max(0.5, Math.min(4.0, customScale));
+    } else {
+      p.scale = currentPortalScale;
+    }
 
     p.normal.set(nx, ny, nz).normalize();
     p.pos.set(px, py, pz);
     p.group.position.copy(p.pos);
+    p.group.scale.set(p.scale, p.scale, p.scale);
     const upVec = Math.abs(p.normal.y) > 0.9 ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(0, 1, 0);
     p.group.up.copy(upVec);
     p.group.lookAt(p.pos.clone().add(p.normal));
@@ -904,9 +941,9 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     p.active = true;
   }
 
-  // Başlangıçta Meydandaki İki Duvara Hazır Açık Mavi & Turuncu Portal Yerleştir
-  applyPortalTransform(bluePortal, -8.28, 4.2, -6, 1, 0, 0, 2);
-  applyPortalTransform(orangePortal, 8.28, 4.2, -6, -1, 0, 0, 3);
+  // Başlangıçta Meydandaki İki Duvara Hazır 1.5x Boyutunda (Araba Geçebilen) Mavi & Turuncu Portal Yerleştir
+  applyPortalTransform(bluePortal, -8.28, 4.8, -6, 1, 0, 0, 2, null, 1.5);
+  applyPortalTransform(orangePortal, 8.28, 4.8, -6, -1, 0, 0, 3, null, 1.5);
 
   function placePortal(isOrange) {
     raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
@@ -920,13 +957,12 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     spawnLaserBeam(startBeam, hit.point, isOrange ? 0xf97316 : 0x38bdf8);
     const p = isOrange ? orangePortal : bluePortal;
     const norm = hit.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize() : new THREE.Vector3(0, 1, 0);
-    // Yüzeyle çakışmayı (Z-fighting) önlemek için duvardan 0.12 birim öne koy
     const pos = hit.point.clone().addScaledVector(norm, 0.12);
     const wallIdx = hit.object.userData?.wallIdx ?? -1;
     const propId = hit.object.userData?.isProp ? hit.object.userData.id : null;
-    applyPortalTransform(p, pos.x, pos.y, pos.z, norm.x, norm.y, norm.z, wallIdx, propId);
+    applyPortalTransform(p, pos.x, pos.y, pos.z, norm.x, norm.y, norm.z, wallIdx, propId, currentPortalScale);
     if (isConnected) {
-      sendPacket({ type: 'placePortal', isOrange, x: pos.x, y: pos.y, z: pos.z, nx: norm.x, ny: norm.y, nz: norm.z, wallIdx });
+      sendPacket({ type: 'placePortal', isOrange, x: pos.x, y: pos.y, z: pos.z, nx: norm.x, ny: norm.y, nz: norm.z, scale: currentPortalScale, wallIdx });
     }
   }
 
@@ -939,6 +975,8 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     const srcInvQ = srcP.group.quaternion.clone().invert();
     rel.applyQuaternion(srcInvQ);
     rel.applyQuaternion(_pRotY180);
+    const scaleRatio = (dstP.scale || 1) / (srcP.scale || 1);
+    rel.multiplyScalar(scaleRatio);
     rel.applyQuaternion(dstP.group.quaternion);
     return dstP.pos.clone().add(rel);
   }
@@ -989,7 +1027,6 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     const virtualPos = transformPointBetweenPortals(_pCamWorldPos, srcPortal, dstPortal);
     const virtualQuat = transformQuatBetweenPortals(_pCamQuat, srcPortal, dstPortal);
 
-    // Sanal kameranın hedef portal duvarının arkasında kalmaması için en az hedef portal düzleminden başlat
     const relFromDst = virtualPos.clone().sub(dstPortal.pos);
     const normalOffset = relFromDst.dot(dstPortal.normal);
     if (normalOffset < 0.08) {
@@ -1223,6 +1260,11 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     });
     chassisMesh.userData = { isCar: true, id }; intersectableObjects.push(chassisMesh); scene.add(group);
 
+    // Araba portaldan geçerken karşı portalda beliren ikiz kopyası (portalClone)
+    const portalClone = model.clone();
+    portalClone.visible = false;
+    scene.add(portalClone);
+
     const body = new CANNON.Body({ mass: 0, type: CANNON.Body.KINEMATIC, material: pm, allowSleep: false });
     body.addShape(new CANNON.Box(new CANNON.Vec3(1.3, 0.65, 2.4)));
     body.position.set(data.x ?? 0, data.y ?? CAR_Y, data.z ?? 0);
@@ -1230,7 +1272,8 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     syncBodyAABB(body); world.addBody(body);
 
     const car = {
-      id, color, group, chassisMesh, wheels, body, vehicle: null, driverId: null, steer: 0, wheelSpin: 0,
+      id, color, group, model, portalClone, chassisMesh, wheels, body, vehicle: null, driverId: null, steer: 0, wheelSpin: 0,
+      portalCd: 0,
       tp: new THREE.Vector3().copy(body.position), tq: new THREE.Quaternion(body.quaternion.x, body.quaternion.y, body.quaternion.z, body.quaternion.w),
       prev: new THREE.Vector3().copy(body.position)
     };
@@ -1608,13 +1651,17 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
         (msg.props || []).forEach((p) => spawnPropVisual(p.id, p));
         (msg.cars || []).forEach((c) => { const car = createCarObject(c.id, c); if (drivingCar !== car) applyRemoteCarState(car, c); });
         if (msg.portals) {
-          if (msg.portals.blue) applyPortalTransform(bluePortal, msg.portals.blue.x, msg.portals.blue.y, msg.portals.blue.z, msg.portals.blue.nx, msg.portals.blue.ny, msg.portals.blue.nz, msg.portals.blue.wallIdx ?? -1);
-          if (msg.portals.orange) applyPortalTransform(orangePortal, msg.portals.orange.x, msg.portals.orange.y, msg.portals.orange.z, msg.portals.orange.nx, msg.portals.orange.ny, msg.portals.orange.nz, msg.portals.orange.wallIdx ?? -1);
+          if (msg.portals.blue) applyPortalTransform(bluePortal, msg.portals.blue.x, msg.portals.blue.y, msg.portals.blue.z, msg.portals.blue.nx, msg.portals.blue.ny, msg.portals.blue.nz, msg.portals.blue.wallIdx ?? -1, null, msg.portals.blue.scale || 1.5);
+          if (msg.portals.orange) applyPortalTransform(orangePortal, msg.portals.orange.x, msg.portals.orange.y, msg.portals.orange.z, msg.portals.orange.nx, msg.portals.orange.ny, msg.portals.orange.nz, msg.portals.orange.wallIdx ?? -1, null, msg.portals.orange.scale || 1.5);
         }
         break;
       case 'placePortal': {
         const targetP = msg.isOrange ? orangePortal : bluePortal;
-        applyPortalTransform(targetP, msg.x, msg.y, msg.z, msg.nx, msg.ny, msg.nz, msg.wallIdx ?? -1);
+        applyPortalTransform(targetP, msg.x, msg.y, msg.z, msg.nx, msg.ny, msg.nz, msg.wallIdx ?? -1, null, msg.scale || currentPortalScale);
+        break;
+      }
+      case 'portalScale': {
+        if (msg.scale) setPortalScaleValue(msg.scale, false);
         break;
       }
       case 'teleportProp': {
@@ -1625,6 +1672,19 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
           if (msg.vx !== undefined) p.body.velocity.set(msg.vx, msg.vy, msg.vz);
           if (msg.qx !== undefined) p.body.quaternion.set(msg.qx, msg.qy, msg.qz, msg.qw);
           p.portalCd = 0.25;
+        }
+        break;
+      }
+      case 'teleportCar': {
+        const c = activeCars[msg.id];
+        if (c && c !== drivingCar) {
+          c.body.position.set(msg.x, msg.y, msg.z);
+          c.tp.set(msg.x, msg.y, msg.z);
+          if (msg.qx !== undefined) {
+            c.body.quaternion.set(msg.qx, msg.qy, msg.qz, msg.qw);
+            c.tq.set(msg.qx, msg.qy, msg.qz, msg.qw);
+          }
+          c.portalCd = 0.35;
         }
         break;
       }
@@ -1865,12 +1925,16 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     const P = {}, parts = [];
     for (const k in RAG_DEFS) {
       const [sz, o, m] = RAG_DEFS[k];
-      const mesh = new THREE.Mesh(new THREE.BoxGeometry(sz[0], sz[1], sz[2]), mat); scene.add(mesh);
+      const partMat = mat.clone();
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(sz[0], sz[1], sz[2]), partMat);
+      const cloneMesh = new THREE.Mesh(new THREE.BoxGeometry(sz[0], sz[1], sz[2]), partMat.clone());
+      cloneMesh.visible = false;
+      scene.add(mesh, cloneMesh);
       const body = new CANNON.Body({ mass: m, material: pm, linearDamping: 0.15, angularDamping: 0.5, allowSleep: false });
       body.addShape(new CANNON.Box(new CANNON.Vec3(sz[0] / 2, sz[1] / 2, sz[2] / 2)));
       body.position.set(base.x + o[0] * cy + o[2] * sy, base.y + o[1], base.z - o[0] * sy + o[2] * cy);
       body.velocity.set(dir.x * 14 + (extra ? extra.x : 0), dir.y * 6 + 4 + (extra ? extra.y : 0), dir.z * 14 + (extra ? extra.z : 0));
-      world.addBody(body); P[k] = body; parts.push({ mesh, body });
+      world.addBody(body); P[k] = body; parts.push({ mesh, cloneMesh, body });
     }
     const V = (a, b, c) => new CANNON.Vec3(a, b, c);
     const cons = [
@@ -1881,20 +1945,17 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
       new CANNON.PointToPointConstraint(P.torso, V(0.3, -0.45, 0), P.legR, V(0, 0.4, 0))
     ];
     cons.forEach((c) => { c.collideConnected = false; world.addConstraint(c); });
-    const r = { parts, cons, mat, torso: P.torso, life }; ragdolls.push(r); return r;
+    const r = { parts, cons, mat, torso: P.torso, life, portalCd: 0 }; ragdolls.push(r); return r;
   }
   function removeRagdoll(r) {
     const i = ragdolls.indexOf(r); if (i > -1) ragdolls.splice(i, 1);
     r.cons.forEach((c) => world.removeConstraint(c));
-    r.parts.forEach((p) => { scene.remove(p.mesh); p.mesh.geometry.dispose(); world.removeBody(p.body); });
+    r.parts.forEach((p) => {
+      scene.remove(p.mesh); p.mesh.geometry.dispose(); p.mesh.material.dispose();
+      if (p.cloneMesh) { scene.remove(p.cloneMesh); p.cloneMesh.geometry.dispose(); p.cloneMesh.material.dispose(); }
+      world.removeBody(p.body);
+    });
     r.mat.dispose();
-  }
-  function updateRagdolls(dt) {
-    for (let i = ragdolls.length - 1; i >= 0; i--) {
-      const r = ragdolls[i];
-      r.parts.forEach((p) => { p.mesh.position.copy(p.body.position); p.mesh.quaternion.copy(p.body.quaternion); });
-      if (r.life !== Infinity && (r.life -= dt) <= 0) removeRagdoll(r);
-    }
   }
   function startLocalRagdoll(dir, extra, autoRespawn) {
     if (isShatteredLocal || !isPlaying) return;
@@ -1932,9 +1993,12 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     pitchObj.rotation.x += (e.movementY || 0) * 0.002 * lookSensitivity * (invertY ? 1 : -1);
     pitchObj.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitchObj.rotation.x));
   });
+  // FARE TEKERLEĞİ İLE PORTAL BOYUTUNU VEYA GRAVITY MESAFESİNİ AYARLAMA
   _d.addEventListener('wheel', (e) => {
     if (grabbedProp) {
       grabDistance = Math.max(2.2, Math.min(18, grabDistance - Math.sign(e.deltaY) * 0.9));
+    } else if (FINGER_MODES[fingerModeIdx].id === 'portal') {
+      setPortalScaleValue(currentPortalScale - Math.sign(e.deltaY) * 0.15, true);
     }
   });
   _d.addEventListener('mousedown', (e) => {
@@ -2044,21 +2108,21 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
   const clock = new THREE.Clock();
   let frames = 0, fpsTimer = 0;
 
-  // DUVAR PHASING YARDIMCISI: Nokta portalın açıklığının içinde mi?
+  // DUVAR PHASING YARDIMCISI (Portalın o anki scale büyüklüğüne göre hesaplar)
   function isInsidePortalAperture(pt, portal, radiusPad = 0.75) {
     if (!portal.active) return false;
+    const sc = portal.scale || 1.0;
     const rel = pt.clone().sub(portal.pos);
     const normalDist = Math.abs(rel.dot(portal.normal));
     const tangentDistSq = Math.max(0, rel.lengthSq() - normalDist * normalDist);
-    return normalDist < (1.55 + radiusPad) && Math.sqrt(tangentDistSq) < (1.65 + radiusPad * 0.5);
+    return normalDist < (1.55 * sc + radiusPad) && Math.sqrt(tangentDistSq) < (1.65 * sc + radiusPad * 0.5);
   }
 
-  // SIFIR SIÇRAMALI (SEAMLESS) OYUNCU PORTAL GEÇİŞİ (Mavi <-> Turuncu İki Yönlü Simetrik)
+  // 1. OYUNCU PORTAL GEÇİŞİ
   function seamlessTeleportPlayer(srcPortal, dstPortal) {
     const curPos = new THREE.Vector3(playerBody.position.x, playerBody.position.y, playerBody.position.z);
     const newPos = transformPointBetweenPortals(curPos, srcPortal, dstPortal);
 
-    // Hedef portalın hemen önünde güvenli mesafede doğmasını garantile
     const relFromDst = newPos.clone().sub(dstPortal.pos);
     const nDist = relFromDst.dot(dstPortal.normal);
     if (nDist < 0.55) {
@@ -2086,7 +2150,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     syncPlayerState(true, true);
   }
 
-  // SIFIR SIÇRAMALI NESNE PORTAL GEÇİŞİ
+  // 2. NESNE PORTAL GEÇİŞİ
   function seamlessTeleportProp(p, srcPortal, dstPortal) {
     if (grabbedProp === p) grabbedProp = null;
     const b = p.body;
@@ -2121,6 +2185,95 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
         vx: outVel.x, vy: outVel.y, vz: outVel.z,
         qx: outQ.x, qy: outQ.y, qz: outQ.z, qw: outQ.w
       });
+    }
+  }
+
+  // 3. ARABA (VEHICLE) PORTAL GEÇİŞİ
+  function seamlessTeleportCar(car, srcPortal, dstPortal) {
+    const b = car.body;
+    const curPos = new THREE.Vector3(b.position.x, b.position.y, b.position.z);
+    const outPos = transformPointBetweenPortals(curPos, srcPortal, dstPortal);
+    const relFromDst = outPos.clone().sub(dstPortal.pos);
+    const nDist = relFromDst.dot(dstPortal.normal);
+    if (nDist < 2.8) {
+      outPos.addScaledVector(dstPortal.normal, 2.8 - nDist);
+    }
+
+    const inVel = new THREE.Vector3(b.velocity.x, b.velocity.y, b.velocity.z);
+    const outVel = transformVecBetweenPortals(inVel, srcPortal, dstPortal);
+    if (outVel.dot(dstPortal.normal) < 8) outVel.addScaledVector(dstPortal.normal, 10);
+
+    const curQ = new THREE.Quaternion(b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w);
+    const outQ = transformQuatBetweenPortals(curQ, srcPortal, dstPortal);
+
+    b.wakeUp();
+    b.position.set(outPos.x, Math.max(CAR_Y, outPos.y), outPos.z);
+    b.velocity.set(outVel.x, outVel.y, outVel.z);
+    b.angularVelocity.set(0, 0, 0);
+    b.quaternion.set(outQ.x, outQ.y, outQ.z, outQ.w);
+    car.group.position.copy(b.position);
+    car.group.quaternion.copy(b.quaternion);
+    car.tp.copy(b.position);
+    car.tq.copy(outQ);
+    car.portalCd = 0.45;
+
+    if (drivingCar === car) {
+      const lookDir = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), yawObj.rotation.y);
+      const newLookDir = transformVecBetweenPortals(lookDir, srcPortal, dstPortal);
+      if (Math.hypot(newLookDir.x, newLookDir.z) > 0.01) {
+        yawObj.rotation.y = Math.atan2(-newLookDir.x, -newLookDir.z);
+      }
+      sendCarState(car);
+      syncPlayerState(true, true);
+    } else if (isConnected) {
+      sendPacket({
+        type: 'teleportCar',
+        id: car.id,
+        x: b.position.x, y: b.position.y, z: b.position.z,
+        vx: outVel.x, vy: outVel.y, vz: outVel.z,
+        qx: outQ.x, qy: outQ.y, qz: outQ.z, qw: outQ.w
+      });
+    }
+  }
+
+  // 4. RAGDOLL PORTAL GEÇİŞİ (Tüm eklem parçalarını dağılmadan karşı portala aktarır)
+  function seamlessTeleportRagdoll(rag, srcPortal, dstPortal) {
+    const torsoPos = new THREE.Vector3(rag.torso.position.x, rag.torso.position.y, rag.torso.position.z);
+    const outTorsoPos = transformPointBetweenPortals(torsoPos, srcPortal, dstPortal);
+    const relFromDst = outTorsoPos.clone().sub(dstPortal.pos);
+    const nDist = relFromDst.dot(dstPortal.normal);
+    if (nDist < 1.1) {
+      outTorsoPos.addScaledVector(dstPortal.normal, 1.1 - nDist);
+    }
+
+    rag.parts.forEach((p) => {
+      const partOffset = new THREE.Vector3(
+        p.body.position.x - torsoPos.x,
+        p.body.position.y - torsoPos.y,
+        p.body.position.z - torsoPos.z
+      );
+      const rotOffset = transformVecBetweenPortals(partOffset, srcPortal, dstPortal);
+      p.body.position.set(
+        outTorsoPos.x + rotOffset.x,
+        outTorsoPos.y + rotOffset.y,
+        outTorsoPos.z + rotOffset.z
+      );
+
+      const inVel = new THREE.Vector3(p.body.velocity.x, p.body.velocity.y, p.body.velocity.z);
+      const outVel = transformVecBetweenPortals(inVel, srcPortal, dstPortal);
+      if (outVel.dot(dstPortal.normal) < 6) outVel.addScaledVector(dstPortal.normal, 8);
+      p.body.velocity.set(outVel.x, outVel.y, outVel.z);
+
+      const curQ = new THREE.Quaternion(p.body.quaternion.x, p.body.quaternion.y, p.body.quaternion.w, p.body.quaternion.z);
+      const outQ = transformQuatBetweenPortals(curQ, srcPortal, dstPortal);
+      p.body.quaternion.set(outQ.x, outQ.y, outQ.z, outQ.w);
+      p.mesh.position.copy(p.body.position);
+      p.mesh.quaternion.copy(p.body.quaternion);
+    });
+
+    rag.portalCd = 0.38;
+    if (rag === localRagdoll) {
+      syncPlayerState(true, true);
     }
   }
 
@@ -2201,7 +2354,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
       playerBody.velocity.z += (targetVz - playerBody.velocity.z) * accel;
     }
 
-    // DÜZELTİLMİŞ DUVAR PHASING: Mavi ve Turuncu portal aynı duvarda olsa bile birbirinin durumunu ezmez
+    // DUVAR PHASING: Oyuncu, Nesne, Araba veya Ragdoll portal ağzındayken duvar çarpışmasını geçici kapat
     const portalsReady = bluePortal.active && orangePortal.active;
     staticMapEntries.forEach((entry) => { entry.body.collisionResponse = true; });
     for (const id in activeProps) {
@@ -2216,13 +2369,24 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
         }
         if (!portal.wallBody || portal.wallBody.isFloor) return;
 
-        let inMouth = isInsidePortalAperture(pPos, portal, playerRadius);
+        let inMouth = (!drivingCar && !isShatteredLocal && isInsidePortalAperture(pPos, portal, playerRadius));
+        if (!inMouth) {
+          for (const cid in activeCars) {
+            const cPos = new THREE.Vector3(activeCars[cid].body.position.x, activeCars[cid].body.position.y, activeCars[cid].body.position.z);
+            if (isInsidePortalAperture(cPos, portal, 2.6)) { inMouth = true; break; }
+          }
+        }
+        if (!inMouth) {
+          for (let ri = 0; ri < ragdolls.length; ri++) {
+            const rPos = new THREE.Vector3(ragdolls[ri].torso.position.x, ragdolls[ri].torso.position.y, ragdolls[ri].torso.position.z);
+            if (isInsidePortalAperture(rPos, portal, 1.4)) { inMouth = true; break; }
+          }
+        }
         if (!inMouth) {
           for (const id in activeProps) {
             const pr = activeProps[id];
             if (!pr.isStatic && isInsidePortalAperture(pr.mesh.position, portal, pr.boundR)) {
-              inMouth = true;
-              break;
+              inMouth = true; break;
             }
           }
         }
@@ -2233,13 +2397,56 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     }
 
     world.step(1 / 60, dt, 3);
-    updateRagdolls(dt);
+
+    // RAGDOLL GÜNCELLEME + RAGDOLL PORTAL GEÇİŞİ & YARI-KESİT KONTROLÜ
+    for (let i = ragdolls.length - 1; i >= 0; i--) {
+      const r = ragdolls[i];
+      if (r.portalCd > 0) r.portalCd -= dt;
+      r.parts.forEach((p) => {
+        p.mesh.position.copy(p.body.position);
+        p.mesh.quaternion.copy(p.body.quaternion);
+        p.mesh.material.clippingPlanes = [];
+        if (p.cloneMesh) p.cloneMesh.visible = false;
+      });
+
+      if (portalsReady) {
+        const tPos = new THREE.Vector3(r.torso.position.x, r.torso.position.y, r.torso.position.z);
+        const dB = tPos.distanceTo(bluePortal.pos);
+        const dO = tPos.distanceTo(orangePortal.pos);
+        const srcP = dB <= dO ? bluePortal : orangePortal;
+        const dstP = dB <= dO ? orangePortal : bluePortal;
+
+        if (isInsidePortalAperture(tPos, srcP, 1.35)) {
+          const rel = tPos.clone().sub(srcP.pos);
+          const normalDist = rel.dot(srcP.normal);
+          const vel = new THREE.Vector3(r.torso.velocity.x, r.torso.velocity.y, r.torso.velocity.z);
+          const movingIn = vel.dot(srcP.normal) < -0.02;
+
+          r.parts.forEach((p) => {
+            p.mesh.material.clippingPlanes = [srcP.clipPlane];
+            if (p.cloneMesh) {
+              p.cloneMesh.material.clippingPlanes = [dstP.clipPlane];
+              p.cloneMesh.position.copy(transformPointBetweenPortals(p.mesh.position, srcP, dstP));
+              p.cloneMesh.quaternion.copy(transformQuatBetweenPortals(p.mesh.quaternion, srcP, dstP));
+              p.cloneMesh.visible = true;
+            }
+          });
+
+          if (normalDist <= 0.48 && movingIn && r.portalCd <= 0) {
+            seamlessTeleportRagdoll(r, srcP, dstP);
+          }
+        }
+      }
+
+      if (r.life !== Infinity && (r.life -= dt) <= 0) removeRagdoll(r);
+    }
+
     if (localRagdoll) { playerObj.position.copy(localRagdoll.torso.position); syncPlayerState(); }
 
     if (isPlaying && !isShatteredLocal) {
       if (drivingCar) {
         vehiclePrompt.classList.remove('hidden');
-        vehiclePrompt.innerText = `Sürüş — İn: [${keybinds.interactCar.toUpperCase()}]`;
+        vehiclePrompt.innerText = `Sürüş — İn: [${keybinds.interactCar.toUpperCase()}] | Portallardan Araba ile Geçebilirsiniz!`;
         playerObj.position.copy(drivingCar.body.position); syncPlayerState();
       } else {
         if (playerBody.position.y < -30) { playerBody.position.set(0, 15, 8); playerBody.velocity.set(0, 0, 0); }
@@ -2252,7 +2459,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
         localRig.root.rotation.y = yawObj.rotation.y;
         animateHumanoidRig(localRig, moveSpd, dt, true);
 
-        // KESİNTİSİZ (SEAMLESS) OYUNCU PORTAL GEÇİŞ KONTROLÜ (Mavi ve Turuncu Tam Simetrik)
+        // OYUNCU PORTAL GEÇİŞ KONTROLÜ
         localPortalCloneRig.root.visible = false;
         setGroupClippingPlane(localRig.root, []);
 
@@ -2280,7 +2487,6 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
             animateHumanoidRig(localPortalCloneRig, moveSpd, dt, true);
             localPortalCloneRig.root.visible = true;
 
-            // Hem duvar çarpışması kapalıyken (<= 0.35) hem de eğimli yüzeylerde (<= 0.65) mavi ve turuncu portaldan sorunsuz geçirir
             if (normalDist <= 0.45 && movingIntoPortal && portalCooldown <= 0) {
               seamlessTeleportPlayer(nearP, farP);
             }
@@ -2316,12 +2522,42 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
       ghostMesh.position.set(tr.x, tr.y, tr.z); ghostMesh.quaternion.copy(tr.q); ghostMesh.visible = true;
     } else ghostMesh.visible = false;
 
+    // ARABALARIN PORTALLARDAN GEÇİŞİ & YARI-KESİT (SPLIT-MESH) KONTROLÜ
     for (const id in activeCars) {
       const c = activeCars[id];
-      c.group.position.copy(c.body.position); c.group.quaternion.copy(c.body.quaternion);
+      if (c.portalCd > 0) c.portalCd -= dt;
+      c.group.position.copy(c.body.position);
+      c.group.quaternion.copy(c.body.quaternion);
+      c.portalClone.visible = false;
+      setGroupClippingPlane(c.group, []);
+
+      if (portalsReady) {
+        const cPos = c.group.position;
+        const dB = cPos.distanceTo(bluePortal.pos);
+        const dO = cPos.distanceTo(orangePortal.pos);
+        const srcP = dB <= dO ? bluePortal : orangePortal;
+        const dstP = dB <= dO ? orangePortal : bluePortal;
+
+        if (isInsidePortalAperture(cPos, srcP, 2.5)) {
+          const rel = cPos.clone().sub(srcP.pos);
+          const normalDist = rel.dot(srcP.normal);
+          const vel = new THREE.Vector3(c.body.velocity.x, c.body.velocity.y, c.body.velocity.z);
+          const movingIn = vel.dot(srcP.normal) < -0.05;
+
+          setGroupClippingPlane(c.group, [srcP.clipPlane]);
+          setGroupClippingPlane(c.portalClone, [dstP.clipPlane]);
+          c.portalClone.position.copy(transformPointBetweenPortals(cPos, srcP, dstP));
+          c.portalClone.quaternion.copy(transformQuatBetweenPortals(c.group.quaternion, srcP, dstP));
+          c.portalClone.visible = true;
+
+          if (normalDist <= 0.65 && movingIn && c.portalCd <= 0) {
+            seamlessTeleportCar(c, srcP, dstP);
+          }
+        }
+      }
     }
 
-    // NESNELERİN KESİNTİSİZ (SEAMLESS) PORTAL GEÇİŞİ VE YARI-KESİT KONTROLÜ
+    // NESNELERİN PORTAL GEÇİŞİ VE YARI-KESİT KONTROLÜ
     for (const id in activeProps) {
       const p = activeProps[id]; if (p.isStatic) continue;
       if (p.portalCd > 0) p.portalCd -= dt;
