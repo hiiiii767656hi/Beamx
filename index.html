@@ -60,7 +60,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
 <body>
 <div id="startScreen" class="flex flex-col items-center justify-center bg-gray-950 no-select px-4 py-6">
   <h1 class="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-fuchsia-500 mb-1 text-center tracking-tighter">PHYSICS SANDBOX</h1>
-  <p class="text-sm md:text-base text-fuchsia-300 mb-4 tracking-widest uppercase font-semibold text-center">Duvar Phasing + Seamless (Kesintisiz) Portallar 🛡️</p>
+  <p class="text-sm md:text-base text-fuchsia-300 mb-4 tracking-widest uppercase font-semibold text-center">Mavi &amp; Turuncu Portal Düzeltilmiş Sürüm 🛡️</p>
 
   <div class="w-96 max-w-full bg-black/80 border-2 border-cyan-500/50 rounded-xl p-3.5 mb-3">
     <div class="flex items-center justify-between mb-2.5">
@@ -98,7 +98,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     <div id="savedServers" class="flex flex-wrap gap-2 w-full"></div>
   </div>
 
-  <p id="authStatus" class="text-gray-400 mb-4 font-mono text-xs text-center">[V] tuşuyla Portal Gun seçin: Sol Tık = Mavi Portal, Sağ Tık (veya Q) = Turuncu Portal!</p>
+  <p id="authStatus" class="text-gray-400 mb-4 font-mono text-xs text-center">Sol Tık = Mavi Portal | Sağ Tık (veya Q) = Turuncu Portal!</p>
 
   <div class="flex flex-wrap gap-3 justify-center">
     <button id="playBtn" type="button" class="px-9 py-3.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold rounded-full text-lg border-2 border-cyan-300 shadow-[0_0_20px_rgba(6,182,212,0.5)] cursor-pointer">ENTER PLAYGROUND</button>
@@ -359,7 +359,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
   }
   ['fullscreenBtn', 'startFullscreenBtn'].forEach((i) => $(i).addEventListener('click', toggleFullscreen));
 
-  // ================= FİZİK DÜNYASI VE PORTAL ÇARPIŞMA GRUPLARI =================
+  // ================= FİZİK DÜNYASI =================
   const world = new CANNON.World();
   world.gravity.set(0, -25, 0);
   world.broadphase = new CANNON.SAPBroadphase(world);
@@ -712,14 +712,16 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     mesh.position.set(x, y + h / 2, z); mesh.rotation.set(rot[0], rot[1], rot[2], 'XYZ');
     mesh.castShadow = mesh.receiveShadow = true;
     const wallIdx = staticMapEntries.length;
-    mesh.userData = { wallIdx };
+    const isHorizontalPlatform = (h <= 2.2 && w >= 12 && d >= 12);
+    mesh.userData = { wallIdx, isFloor: isHorizontalPlatform };
     scene.add(mesh); intersectableObjects.push(mesh);
 
     const body = new CANNON.Body({ mass: 0, type: CANNON.Body.STATIC, material: pm });
+    body.isFloor = isHorizontalPlatform;
     body.addShape(new CANNON.Box(new CANNON.Vec3(w / 2, h / 2, d / 2)));
     body.position.copy(mesh.position); body.quaternion.set(mesh.quaternion.x, mesh.quaternion.y, mesh.quaternion.z, mesh.quaternion.w);
     syncBodyAABB(body); world.addBody(body);
-    staticMapEntries.push({ mesh, body, wallIdx });
+    staticMapEntries.push({ mesh, body, wallIdx, isFloor: isHorizontalPlatform });
   }
 
   (function() {
@@ -728,13 +730,14 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     floor.userData = { wallIdx: -1, isFloor: true };
     scene.add(floor); intersectableObjects.push(floor);
     const fb = new CANNON.Body({ mass: 0, type: CANNON.Body.STATIC, material: pm });
+    fb.isFloor = true;
     fb.addShape(new CANNON.Box(new CANNON.Vec3(300, 1, 300)));
     fb.position.set(0, -1, 0); syncBodyAABB(fb); world.addBody(fb);
 
     const B = [];
     B.push([0, 0, 0, 20, 2, 20, 0x333333, false]);
     B.push([0, 2, 0, 10, 8, 10, 0x00ffff, true]);
-    // Başlangıç Meydanına Test İçin 2 Adet Portal Duvarı Eklendi
+    // Başlangıç Meydanına Test İçin 2 Adet Portal Duvarı
     B.push([-9, 2, -6, 1.2, 6, 8, 0x334155, false]);
     B.push([9, 2, -6, 1.2, 6, 8, 0x334155, false]);
     let px = 20, py = 2, pz = 0;
@@ -782,11 +785,33 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     B.forEach((b) => addStaticBlock(b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8]));
   })();
 
-  // ================= EKRAN UZAYI PERSPEKTİFLİ & DUVAR PHASING DESTEKLİ PORTAL SİSTEMİ =================
+  // Portalın açıldığı noktadaki duvar gövdesini otomatik bulur (mavi veya turuncu fark etmeksizin)
+  function findClosestWallBody(pos, norm, wallIdx = -1, propId = null) {
+    if (wallIdx >= 0 && staticMapEntries[wallIdx] && !staticMapEntries[wallIdx].isFloor) {
+      return staticMapEntries[wallIdx].body;
+    }
+    if (propId && activeProps[propId]) {
+      return activeProps[propId].body;
+    }
+    // Eğer wallIdx gelmediyse (örn. sunucu init paketi), portalın hemen arkasındaki nesneyi raycast ile bul
+    const probeStart = pos.clone().addScaledVector(norm, 0.35);
+    const probeDir = norm.clone().negate();
+    const rc = new THREE.Raycaster(probeStart, probeDir, 0, 1.5);
+    const hit = rc.intersectObjects(intersectableObjects, false)[0];
+    if (hit && hit.object.userData) {
+      const wIdx = hit.object.userData.wallIdx;
+      if (wIdx !== undefined && wIdx >= 0 && staticMapEntries[wIdx] && !staticMapEntries[wIdx].isFloor) {
+        return staticMapEntries[wIdx].body;
+      }
+    }
+    return null;
+  }
+
+  // ================= DÜZELTİLMİŞ MAVİ & TURUNCU PORTAL SİSTEMİ =================
   let portalCooldown = 0;
   const portalRes = isTouch ? 512 : 1024;
 
-  function makePortalSystem(hexColor) {
+  function makePortalSystem(hexColor, isOrangeFlag) {
     const rt = new THREE.WebGLRenderTarget(portalRes, portalRes, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter });
     const cam = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.05, 600);
     const g = new THREE.Group();
@@ -798,7 +823,6 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     border.scale.set(0.92, 1.42, 1);
     g.add(border);
 
-    // Ekran uzayı (screen-space) kaplama shader'ı: Kamera portala hangi açıdan bakarsa baksın sıfır yamulma ve tam pencere perspektifi verir
     const surfaceMat = new THREE.ShaderMaterial({
       uniforms: {
         tDiffuse: { value: rt.texture },
@@ -820,13 +844,15 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
         uniform vec3 uColor;
         varying vec2 vUv;
         void main() {
+          float borderFade = smoothstep(0.5, 0.42, distance(vUv, vec2(0.5)));
           if (uLinked == 0) {
-            float d = distance(vUv, vec2(0.5));
-            gl_FragColor = vec4(uColor * (0.35 + 0.45 * (1.0 - d)), 0.92);
+            gl_FragColor = vec4(uColor * (0.4 + 0.5 * borderFade), 0.95);
             return;
           }
-          vec2 screenUV = gl_FragCoord.xy / uResolution;
-          gl_FragColor = texture2D(tDiffuse, screenUV);
+          vec2 screenUV = clamp(gl_FragCoord.xy / uResolution, 0.001, 0.999);
+          vec4 texColor = texture2D(tDiffuse, screenUV);
+          vec3 finalCol = mix(uColor, texColor.rgb, borderFade);
+          gl_FragColor = vec4(finalCol, 1.0);
         }
       `,
       side: THREE.DoubleSide
@@ -849,40 +875,38 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     scene.add(g);
     const clipPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
     return {
+      isOrange: isOrangeFlag,
       group: g, inner, surfaceMat, rt, cam, hexColor, clipPlane,
       active: false, pos: new THREE.Vector3(), normal: new THREE.Vector3(0, 0, 1),
-      wallBody: null, wallIdx: -1, prevPlayerSide: null
+      wallBody: null, wallIdx: -1
     };
   }
 
-  const bluePortal = makePortalSystem(0x38bdf8);
-  const orangePortal = makePortalSystem(0xf97316);
+  const bluePortal = makePortalSystem(0x38bdf8, false);
+  const orangePortal = makePortalSystem(0xf97316, true);
 
   function applyPortalTransform(p, px, py, pz, nx, ny, nz, wallIdx = -1, propId = null) {
-    p.pos.set(px, py, pz);
+    // Eski duvarın çarpışmasını geri aç
+    if (p.wallBody) p.wallBody.collisionResponse = true;
+
     p.normal.set(nx, ny, nz).normalize();
+    p.pos.set(px, py, pz);
     p.group.position.copy(p.pos);
     const upVec = Math.abs(p.normal.y) > 0.9 ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(0, 1, 0);
     p.group.up.copy(upVec);
     p.group.lookAt(p.pos.clone().add(p.normal));
     p.group.updateMatrixWorld();
-    p.clipPlane.setFromNormalAndCoplanarPoint(p.normal, p.pos.clone().addScaledVector(p.normal, -0.02));
+
+    p.clipPlane.setFromNormalAndCoplanarPoint(p.normal, p.pos.clone().addScaledVector(p.normal, -0.04));
+    p.wallBody = findClosestWallBody(p.pos, p.normal, wallIdx, propId);
     p.wallIdx = wallIdx;
-    if (wallIdx >= 0 && staticMapEntries[wallIdx]) {
-      p.wallBody = staticMapEntries[wallIdx].body;
-    } else if (propId && activeProps[propId]) {
-      p.wallBody = activeProps[propId].body;
-    } else {
-      p.wallBody = null;
-    }
     p.group.visible = true;
     p.active = true;
-    p.prevPlayerSide = null;
   }
 
-  // Başlangıçta Meydandaki İki Duvara Hazır Açık Mavi & Turuncu Portal Yerleştir (Hemen Test Edilebilsin)
-  applyPortalTransform(bluePortal, -8.35, 4.2, -6, 1, 0, 0, 2);
-  applyPortalTransform(orangePortal, 8.35, 4.2, -6, -1, 0, 0, 3);
+  // Başlangıçta Meydandaki İki Duvara Hazır Açık Mavi & Turuncu Portal Yerleştir
+  applyPortalTransform(bluePortal, -8.28, 4.2, -6, 1, 0, 0, 2);
+  applyPortalTransform(orangePortal, 8.28, 4.2, -6, -1, 0, 0, 3);
 
   function placePortal(isOrange) {
     raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
@@ -896,7 +920,8 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     spawnLaserBeam(startBeam, hit.point, isOrange ? 0xf97316 : 0x38bdf8);
     const p = isOrange ? orangePortal : bluePortal;
     const norm = hit.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize() : new THREE.Vector3(0, 1, 0);
-    const pos = hit.point.clone().addScaledVector(norm, 0.05);
+    // Yüzeyle çakışmayı (Z-fighting) önlemek için duvardan 0.12 birim öne koy
+    const pos = hit.point.clone().addScaledVector(norm, 0.12);
     const wallIdx = hit.object.userData?.wallIdx ?? -1;
     const propId = hit.object.userData?.isProp ? hit.object.userData.id : null;
     applyPortalTransform(p, pos.x, pos.y, pos.z, norm.x, norm.y, norm.z, wallIdx, propId);
@@ -963,6 +988,13 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     const pCam = srcPortal.cam;
     const virtualPos = transformPointBetweenPortals(_pCamWorldPos, srcPortal, dstPortal);
     const virtualQuat = transformQuatBetweenPortals(_pCamQuat, srcPortal, dstPortal);
+
+    // Sanal kameranın hedef portal duvarının arkasında kalmaması için en az hedef portal düzleminden başlat
+    const relFromDst = virtualPos.clone().sub(dstPortal.pos);
+    const normalOffset = relFromDst.dot(dstPortal.normal);
+    if (normalOffset < 0.08) {
+      virtualPos.addScaledVector(dstPortal.normal, 0.08 - normalOffset);
+    }
 
     pCam.position.copy(virtualPos);
     pCam.quaternion.copy(virtualQuat);
@@ -1393,7 +1425,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     syncBodyAABB(body); world.addBody(body);
 
     const boundR = t.s === 'ball' ? t.r : Math.max(t.h[0], t.h[1], t.h[2]);
-    const p = { id, propType: type, mesh, portalClone, boundR, body, isStatic, portalCd: 0, prevSide: null };
+    const p = { id, propType: type, mesh, portalClone, boundR, body, isStatic, portalCd: 0 };
     activeProps[id] = p; return p;
   }
 
@@ -1576,8 +1608,8 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
         (msg.props || []).forEach((p) => spawnPropVisual(p.id, p));
         (msg.cars || []).forEach((c) => { const car = createCarObject(c.id, c); if (drivingCar !== car) applyRemoteCarState(car, c); });
         if (msg.portals) {
-          if (msg.portals.blue) applyPortalTransform(bluePortal, msg.portals.blue.x, msg.portals.blue.y, msg.portals.blue.z, msg.portals.blue.nx, msg.portals.blue.ny, msg.portals.blue.nz, msg.portals.blue.wallIdx);
-          if (msg.portals.orange) applyPortalTransform(orangePortal, msg.portals.orange.x, msg.portals.orange.y, msg.portals.orange.z, msg.portals.orange.nx, msg.portals.orange.ny, msg.portals.orange.nz, msg.portals.orange.wallIdx);
+          if (msg.portals.blue) applyPortalTransform(bluePortal, msg.portals.blue.x, msg.portals.blue.y, msg.portals.blue.z, msg.portals.blue.nx, msg.portals.blue.ny, msg.portals.blue.nz, msg.portals.blue.wallIdx ?? -1);
+          if (msg.portals.orange) applyPortalTransform(orangePortal, msg.portals.orange.x, msg.portals.orange.y, msg.portals.orange.z, msg.portals.orange.nx, msg.portals.orange.ny, msg.portals.orange.nz, msg.portals.orange.wallIdx ?? -1);
         }
         break;
       case 'placePortal': {
@@ -2012,25 +2044,36 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
   const clock = new THREE.Clock();
   let frames = 0, fpsTimer = 0;
 
-  // DUVAR PHASING (GEÇİŞ) YARDIMCISI: Bir nokta portalın açıklığının (oval kapının) içinde mi?
-  function isInsidePortalAperture(pt, portal, radiusPad = 0.65) {
+  // DUVAR PHASING YARDIMCISI: Nokta portalın açıklığının içinde mi?
+  function isInsidePortalAperture(pt, portal, radiusPad = 0.75) {
     if (!portal.active) return false;
     const rel = pt.clone().sub(portal.pos);
     const normalDist = Math.abs(rel.dot(portal.normal));
     const tangentDistSq = Math.max(0, rel.lengthSq() - normalDist * normalDist);
-    return normalDist < (1.45 + radiusPad) && Math.sqrt(tangentDistSq) < (1.55 + radiusPad * 0.5);
+    return normalDist < (1.55 + radiusPad) && Math.sqrt(tangentDistSq) < (1.65 + radiusPad * 0.5);
   }
 
-  // SIFIR SIÇRAMALI (SEAMLESS) OYUNCU PORTAL GEÇİŞİ
+  // SIFIR SIÇRAMALI (SEAMLESS) OYUNCU PORTAL GEÇİŞİ (Mavi <-> Turuncu İki Yönlü Simetrik)
   function seamlessTeleportPlayer(srcPortal, dstPortal) {
     const curPos = new THREE.Vector3(playerBody.position.x, playerBody.position.y, playerBody.position.z);
     const newPos = transformPointBetweenPortals(curPos, srcPortal, dstPortal);
-    newPos.addScaledVector(dstPortal.normal, 0.18);
+
+    // Hedef portalın hemen önünde güvenli mesafede doğmasını garantile
+    const relFromDst = newPos.clone().sub(dstPortal.pos);
+    const nDist = relFromDst.dot(dstPortal.normal);
+    if (nDist < 0.55) {
+      newPos.addScaledVector(dstPortal.normal, 0.55 - nDist);
+    }
+
     playerBody.position.set(newPos.x, newPos.y, newPos.z);
     playerObj.position.copy(playerBody.position);
 
     const curVel = new THREE.Vector3(playerBody.velocity.x, playerBody.velocity.y, playerBody.velocity.z);
     const outVel = transformVecBetweenPortals(curVel, srcPortal, dstPortal);
+    const minOutSpd = Math.max(8, curVel.length());
+    if (outVel.dot(dstPortal.normal) < 4) {
+      outVel.addScaledVector(dstPortal.normal, minOutSpd * 0.6);
+    }
     playerBody.velocity.set(outVel.x, outVel.y, outVel.z);
 
     const lookDir = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), yawObj.rotation.y);
@@ -2039,9 +2082,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
       yawObj.rotation.y = Math.atan2(-newLookDir.x, -newLookDir.z);
     }
 
-    bluePortal.prevPlayerSide = null;
-    orangePortal.prevPlayerSide = null;
-    portalCooldown = 0.16;
+    portalCooldown = 0.25;
     syncPlayerState(true, true);
   }
 
@@ -2050,11 +2091,16 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     if (grabbedProp === p) grabbedProp = null;
     const b = p.body;
     const curPos = new THREE.Vector3(b.position.x, b.position.y, b.position.z);
-    const outPos = transformPointBetweenPortals(curPos, srcPortal, dstPortal).addScaledVector(dstPortal.normal, 0.28);
+    const outPos = transformPointBetweenPortals(curPos, srcPortal, dstPortal);
+    const relFromDst = outPos.clone().sub(dstPortal.pos);
+    const nDist = relFromDst.dot(dstPortal.normal);
+    if (nDist < p.boundR + 0.35) {
+      outPos.addScaledVector(dstPortal.normal, (p.boundR + 0.35) - nDist);
+    }
 
     const inVel = new THREE.Vector3(b.velocity.x, b.velocity.y, b.velocity.z);
     const outVel = transformVecBetweenPortals(inVel, srcPortal, dstPortal);
-    if (outVel.lengthSq() < 16) outVel.addScaledVector(dstPortal.normal, 5);
+    if (outVel.dot(dstPortal.normal) < 6) outVel.addScaledVector(dstPortal.normal, 7);
 
     const curQ = new THREE.Quaternion(b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w);
     const outQ = transformQuatBetweenPortals(curQ, srcPortal, dstPortal);
@@ -2065,8 +2111,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     b.quaternion.set(outQ.x, outQ.y, outQ.z, outQ.w);
     p.mesh.position.copy(b.position);
     p.mesh.quaternion.copy(b.quaternion);
-    p.portalCd = 0.2;
-    p.prevSide = null;
+    p.portalCd = 0.28;
 
     if (isConnected) {
       sendPacket({
@@ -2156,27 +2201,35 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
       playerBody.velocity.z += (targetVz - playerBody.velocity.z) * accel;
     }
 
-    // DUVAR PHASING: Oyuncu veya bir nesne açık olan portalın ağzındayken duvarın çarpışmasını geçici olarak kaldırır
+    // DÜZELTİLMİŞ DUVAR PHASING: Mavi ve Turuncu portal aynı duvarda olsa bile birbirinin durumunu ezmez
     const portalsReady = bluePortal.active && orangePortal.active;
+    staticMapEntries.forEach((entry) => { entry.body.collisionResponse = true; });
+    for (const id in activeProps) {
+      if (activeProps[id].body) activeProps[id].body.collisionResponse = true;
+    }
+
     if (portalsReady) {
+      const pPos = new THREE.Vector3(playerBody.position.x, playerBody.position.y, playerBody.position.z);
       [bluePortal, orangePortal].forEach((portal) => {
-        if (!portal.wallBody) return;
-        const pPos = new THREE.Vector3(playerBody.position.x, playerBody.position.y, playerBody.position.z);
-        let anythingInMouth = isInsidePortalAperture(pPos, portal, playerRadius);
-        if (!anythingInMouth) {
+        if (!portal.wallBody) {
+          portal.wallBody = findClosestWallBody(portal.pos, portal.normal, portal.wallIdx);
+        }
+        if (!portal.wallBody || portal.wallBody.isFloor) return;
+
+        let inMouth = isInsidePortalAperture(pPos, portal, playerRadius);
+        if (!inMouth) {
           for (const id in activeProps) {
             const pr = activeProps[id];
             if (!pr.isStatic && isInsidePortalAperture(pr.mesh.position, portal, pr.boundR)) {
-              anythingInMouth = true;
+              inMouth = true;
               break;
             }
           }
         }
-        portal.wallBody.collisionResponse = !anythingInMouth;
+        if (inMouth) {
+          portal.wallBody.collisionResponse = false;
+        }
       });
-    } else {
-      if (bluePortal.wallBody) bluePortal.wallBody.collisionResponse = true;
-      if (orangePortal.wallBody) orangePortal.wallBody.collisionResponse = true;
     }
 
     world.step(1 / 60, dt, 3);
@@ -2199,7 +2252,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
         localRig.root.rotation.y = yawObj.rotation.y;
         animateHumanoidRig(localRig, moveSpd, dt, true);
 
-        // KESİNTİSİZ (SEAMLESS) OYUNCU PORTAL GEÇİŞ KONTROLÜ
+        // KESİNTİSİZ (SEAMLESS) OYUNCU PORTAL GEÇİŞ KONTROLÜ (Mavi ve Turuncu Tam Simetrik)
         localPortalCloneRig.root.visible = false;
         setGroupClippingPlane(localRig.root, []);
 
@@ -2207,14 +2260,14 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
           const pPos = new THREE.Vector3(playerBody.position.x, playerBody.position.y, playerBody.position.z);
           const dBlue = pPos.distanceTo(bluePortal.pos);
           const dOrange = pPos.distanceTo(orangePortal.pos);
-          const nearP = dBlue < dOrange ? bluePortal : orangePortal;
-          const farP  = dBlue < dOrange ? orangePortal : bluePortal;
+          const nearP = dBlue <= dOrange ? bluePortal : orangePortal;
+          const farP  = dBlue <= dOrange ? orangePortal : bluePortal;
 
           if (isInsidePortalAperture(pPos, nearP, playerRadius)) {
             const relVec = pPos.clone().sub(nearP.pos);
             const normalDist = relVec.dot(nearP.normal);
             const velVec = new THREE.Vector3(playerBody.velocity.x, playerBody.velocity.y, playerBody.velocity.z);
-            const movingIntoPortal = velVec.dot(nearP.normal) < -0.05;
+            const movingIntoPortal = velVec.dot(nearP.normal) < -0.02;
 
             setGroupClippingPlane(localRig.root, [nearP.clipPlane]);
             setGroupClippingPlane(localPortalCloneRig.root, [farP.clipPlane]);
@@ -2227,15 +2280,10 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
             animateHumanoidRig(localPortalCloneRig, moveSpd, dt, true);
             localPortalCloneRig.root.visible = true;
 
-            // Duvar çarpışması kalktığı için oyuncu tam yüzeyi (normalDist <= 0.05) delip geçtiği anda sıfır sıçrama ile karşıya geçer
-            if (normalDist <= 0.05 && movingIntoPortal && portalCooldown <= 0) {
+            // Hem duvar çarpışması kapalıyken (<= 0.35) hem de eğimli yüzeylerde (<= 0.65) mavi ve turuncu portaldan sorunsuz geçirir
+            if (normalDist <= 0.45 && movingIntoPortal && portalCooldown <= 0) {
               seamlessTeleportPlayer(nearP, farP);
-            } else {
-              nearP.prevPlayerSide = normalDist;
             }
-          } else {
-            bluePortal.prevPlayerSide = null;
-            orangePortal.prevPlayerSide = null;
           }
         }
 
@@ -2294,14 +2342,14 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
         const pos = p.mesh.position;
         const dB = pos.distanceTo(bluePortal.pos);
         const dO = pos.distanceTo(orangePortal.pos);
-        const srcP = dB < dO ? bluePortal : orangePortal;
-        const dstP = dB < dO ? orangePortal : bluePortal;
+        const srcP = dB <= dO ? bluePortal : orangePortal;
+        const dstP = dB <= dO ? orangePortal : bluePortal;
 
         if (isInsidePortalAperture(pos, srcP, p.boundR)) {
           const rel = pos.clone().sub(srcP.pos);
           const normalDist = rel.dot(srcP.normal);
           const vel = new THREE.Vector3(p.body.velocity.x, p.body.velocity.y, p.body.velocity.z);
-          const movingIn = vel.dot(srcP.normal) < -0.05;
+          const movingIn = vel.dot(srcP.normal) < -0.02 || grabbedProp === p;
 
           p.mesh.material.clippingPlanes = [srcP.clipPlane];
           if (p.portalClone) {
@@ -2311,13 +2359,9 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
             p.portalClone.visible = true;
           }
 
-          if (normalDist <= 0.05 && movingIn && p.portalCd <= 0) {
+          if (normalDist <= 0.45 && movingIn && p.portalCd <= 0) {
             seamlessTeleportProp(p, srcP, dstP);
-          } else {
-            p.prevSide = normalDist;
           }
-        } else {
-          p.prevSide = null;
         }
       }
     }
