@@ -60,7 +60,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
 <body>
 <div id="startScreen" class="flex flex-col items-center justify-center bg-gray-950 no-select px-4 py-6">
   <h1 class="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-fuchsia-500 mb-1 text-center tracking-tighter">PHYSICS SANDBOX</h1>
-  <p class="text-sm md:text-base text-fuchsia-300 mb-4 tracking-widest uppercase font-semibold text-center">Rastgele Silah &amp; Loot + Stabil Fizik 🛡️</p>
+  <p class="text-sm md:text-base text-fuchsia-300 mb-4 tracking-widest uppercase font-semibold text-center">Yarı-Kesit Portallar (Split-Mesh) &amp; Nesne Geçişi 🛡️</p>
 
   <div class="w-96 max-w-full bg-black/80 border-2 border-cyan-500/50 rounded-xl p-3.5 mb-3">
     <div class="flex items-center justify-between mb-2.5">
@@ -98,7 +98,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     <div id="savedServers" class="flex flex-wrap gap-2 w-full"></div>
   </div>
 
-  <p id="authStatus" class="text-gray-400 mb-4 font-mono text-xs text-center">Haritada rastgele çıkan HP, Zırh, Ammo, Gravity Gun ve Portal Gun'ı toplayın!</p>
+  <p id="authStatus" class="text-gray-400 mb-4 font-mono text-xs text-center">Nesneleri ve kendinizi portalların yarısına sokup diğer taraftan çıkışını izleyebilirsiniz!</p>
 
   <div class="flex flex-wrap gap-3 justify-center">
     <button id="playBtn" type="button" class="px-9 py-3.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold rounded-full text-lg border-2 border-cyan-300 shadow-[0_0_20px_rgba(6,182,212,0.5)] cursor-pointer">ENTER PLAYGROUND</button>
@@ -133,7 +133,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     <div id="armorBarFill" class="stat-fill" style="background:linear-gradient(90deg,#0284c7,#38bdf8);width:50%"></div>
     <div id="armorText" class="stat-text">🛡️ 50 Zırh</div>
   </div>
-  <div id="ammoBadge">🔋 50 Ammo</div>
+  <div id="ammoBadge">🔋 60 Ammo</div>
 </div>
 
 <div id="vehiclePrompt" class="hidden no-select"></div>
@@ -359,15 +359,23 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
   }
   ['fullscreenBtn', 'startFullscreenBtn'].forEach((i) => $(i).addEventListener('click', toggleFullscreen));
 
+  // ================= AKICI FİZİK VE OYUNCU MATERYALİ =================
   const world = new CANNON.World();
   world.gravity.set(0, -25, 0);
   world.broadphase = new CANNON.SAPBroadphase(world);
   world.solver.iterations = 15;
   const pm = new CANNON.Material('std');
+  const playerMat = new CANNON.Material('playerMat');
   const bounceMat = new CANNON.Material('bounce');
-  const pcm = new CANNON.ContactMaterial(pm, pm, { friction: 0.25, restitution: 0.05, contactEquationStiffness: 1e8, contactEquationRelaxation: 3 });
+  const pcm = new CANNON.ContactMaterial(pm, pm, { friction: 0.35, restitution: 0.05, contactEquationStiffness: 1e8, contactEquationRelaxation: 3 });
+  const playerContactMat = new CANNON.ContactMaterial(playerMat, pm, { friction: 0.0, restitution: 0.0, contactEquationStiffness: 1e8, contactEquationRelaxation: 3 });
   const bounceCm = new CANNON.ContactMaterial(pm, bounceMat, { friction: 0.1, restitution: 1.35, contactEquationStiffness: 1e8, contactEquationRelaxation: 3 });
-  world.addContactMaterial(pcm); world.addContactMaterial(bounceCm); world.defaultContactMaterial = pcm;
+  const playerBounceCm = new CANNON.ContactMaterial(playerMat, bounceMat, { friction: 0.0, restitution: 1.35, contactEquationStiffness: 1e8, contactEquationRelaxation: 3 });
+  world.addContactMaterial(pcm);
+  world.addContactMaterial(playerContactMat);
+  world.addContactMaterial(bounceCm);
+  world.addContactMaterial(playerBounceCm);
+  world.defaultContactMaterial = pcm;
   const syncBodyAABB = (b) => { b.aabbNeedsUpdate = true; b.computeAABB(); };
 
   const scene = new THREE.Scene();
@@ -382,6 +390,8 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
   renderer.setPixelRatio(Math.min(devicePixelRatio, isTouch ? 1.5 : 2));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  // PORTAL YARI-KESİT (CLIPPING) AKTİF
+  renderer.localClippingEnabled = true;
   _d.body.insertBefore(renderer.domElement, _d.body.firstChild);
   scene.add(new THREE.AmbientLight(0x505575, 0.75));
   const moonLight = new THREE.DirectionalLight(0x66bbff, 0.9);
@@ -457,14 +467,29 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     rig.armL.rotation.x = -swing * 0.8; rig.armR.rotation.x = isAiming ? 1.35 : swing * 0.8;
   }
 
+  function setGroupClippingPlane(groupObj, planeList) {
+    groupObj.traverse((child) => {
+      if (child.isMesh && child.material) {
+        child.material.clippingPlanes = planeList;
+      }
+    });
+  }
+
   let localRig = buildRealisticHumanoid(myColor, mySkin);
   localRig.root.visible = false; scene.add(localRig.root);
+  // Oyuncu portalın yarısındayken karşı portaldan çıkan ikiz avatarı
+  let localPortalCloneRig = buildRealisticHumanoid(myColor, mySkin);
+  localPortalCloneRig.root.visible = false; scene.add(localPortalCloneRig.root);
 
   function rebuildLocalAvatar() {
     scene.remove(localRig.root);
+    scene.remove(localPortalCloneRig.root);
     localRig = buildRealisticHumanoid(myColor, mySkin);
+    localPortalCloneRig = buildRealisticHumanoid(myColor, mySkin);
     localRig.root.visible = thirdPerson && !drivingCar && !marbleMode && !isShatteredLocal;
+    localPortalCloneRig.root.visible = false;
     scene.add(localRig.root);
+    scene.add(localPortalCloneRig.root);
     $('hudSkinName').textContent = (SKIN_PRESETS[mySkin] || SKIN_PRESETS.default).label;
   }
 
@@ -500,13 +525,13 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     return best;
   }
 
-  // ================= SİLAH MODLARI & HARİTADA RASTGELE ÇIKAN LOOT SİSTEMİ =================
+  // ================= SİLAH MODLARI & RASTGELE LOOT =================
   const FINGER_MODES = [
     { id: 'pew',     name: '👉 Klasik Pew (-25 HP)',              btn: '👉 Mod: Pew',     color: 0x00ffff, force: 18, dmg: 25, cost: 1, unlocked: true },
     { id: 'force',   name: '⚡ Süper İtme (-50 HP)',              btn: '⚡ Mod: Süper',   color: 0xd946ef, force: 42, dmg: 50, cost: 3, unlocked: true },
     { id: 'spawn',   name: '🎲 Eşya Atar',                        btn: '🎲 Mod: Eşya',    color: 0xfacc15, force: 16, dmg: 15, cost: 2, unlocked: true },
     { id: 'gravity', name: '🧲 Gravity Gun (Sol: Tut/At | E: Bırak)', btn: '🧲 Mod: Gravity', color: 0xf97316, force: 36, dmg: 10, cost: 0, unlocked: false },
-    { id: 'portal',  name: '🌀 Portal Gun (Sol: Mavi | Q: Turuncu)',  btn: '🌀 Mod: Portal',  color: 0x38bdf8, force: 15, dmg: 0,  cost: 2, unlocked: false }
+    { id: 'portal',  name: '🌀 Portal Gun (Sol: Mavi | Sağ/Q: Turuncu)', btn: '🌀 Mod: Portal', color: 0x38bdf8, force: 15, dmg: 0, cost: 2, unlocked: false }
   ];
   let fingerModeIdx = 0, fingerRecoil = 0, walkBobTimer = 0;
   let grabbedProp = null, grabDistance = 6.5;
@@ -547,7 +572,6 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     return g;
   }
 
-  // HARİTADA RASTGELE DOĞAN SİLAH VE EŞYA NOKTALARI (HP, Zırh, Ammo, Gravity Gun, Portal Gun)
   const RANDOM_SPAWN_ZONES = [
     [8, 2, -6], [-8, 2, -6], [0, 2, -18], [16, 0, 20], [-16, 0, 20],
     [0, 3, -70], [18, 3, -75], [-18, 3, -75], [-90, 1, -60], [-82, 1, -55],
@@ -558,11 +582,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
   const worldPickups = [];
   function pickRandomZone() {
     const z = RANDOM_SPAWN_ZONES[Math.floor(Math.random() * RANDOM_SPAWN_ZONES.length)];
-    return {
-      x: z[0] + (Math.random() - 0.5) * 10,
-      y: z[1],
-      z: z[2] + (Math.random() - 0.5) * 10
-    };
+    return { x: z[0] + (Math.random() - 0.5) * 10, y: z[1], z: z[2] + (Math.random() - 0.5) * 10 };
   }
 
   function relocatePickupRandomly(pk) {
@@ -570,9 +590,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     pk.x = pos.x; pk.y = pos.y; pk.z = pos.z;
     pk.base.position.set(pk.x, pk.y + 0.15, pk.z);
     pk.model.position.set(pk.x, pk.y + 1.2, pk.z);
-    pk.active = true;
-    pk.base.visible = true;
-    pk.model.visible = true;
+    pk.active = true; pk.base.visible = true; pk.model.visible = true;
   }
 
   (function initRandomWorldPickups() {
@@ -607,7 +625,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     if (pk.kind === 'gravity' || pk.kind === 'portal') {
       selectWeaponById(pk.kind);
       updateStatsUI(undefined, undefined, _0xV.getAmmo() + 25);
-      appendChatMessage('LOOT', '#facc15', `${pk.title} bulundu! Sol tık ile kullanın, [V] ile değiştirin.`);
+      appendChatMessage('LOOT', '#facc15', `${pk.title} bulundu! Sol tık ve Sağ tık / [Q] ile kullanın.`);
     } else if (pk.kind === 'hp') {
       updateStatsUI(_0xV.getHp() + 50, undefined, undefined);
       if (isConnected) sendPacket({ type: 'healSelf', amount: 50 });
@@ -620,13 +638,10 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
       updateStatsUI(undefined, undefined, _0xV.getAmmo() + 30);
       appendChatMessage('LOOT', '#fde047', '🔋 Mermi Kutusu alındı! (+30 Ammo)');
     }
-    pk.active = false;
-    pk.base.visible = false;
-    pk.model.visible = false;
+    pk.active = false; pk.base.visible = false; pk.model.visible = false;
     setTimeout(() => relocatePickupRandomly(pk), 9000);
   }
 
-  // 1. Şahıs El & Silah Görünümü
   const fingerGunGroup = new THREE.Group();
   const handSubGroup = new THREE.Group();
   const gravityGunSubModel = buildWeaponVisualModel('gravity');
@@ -683,20 +698,49 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
   }
   $('fingerModeBtn').addEventListener('click', (e) => { e.currentTarget.blur(); cycleFingerMode(); });
 
-  // ================= PORTAL GUN SİSTEMİ (MAVİ VE TURUNCU KAPI) =================
+  // ================= GERÇEK PORTAL SİSTEMİ: KAMERA + YARI-KESİT (CLIPPING) + NESNE GEÇİŞİ =================
   let portalCooldown = 0;
-  function makePortalMesh(hexColor) {
+  const portalRes = isTouch ? 256 : 512;
+
+  function makePortalSystem(hexColor) {
+    const rt = new THREE.WebGLRenderTarget(portalRes, portalRes, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter });
+    const cam = new THREE.PerspectiveCamera(65, 0.85 / 1.35, 0.2, 600);
     const g = new THREE.Group();
-    const border = new THREE.Mesh(new THREE.TorusGeometry(1.45, 0.14, 12, 32), new THREE.MeshBasicMaterial({ color: hexColor }));
-    border.scale.set(0.85, 1.35, 1); g.add(border);
-    const inner = new THREE.Mesh(new THREE.CircleGeometry(1.38, 28), new THREE.MeshBasicMaterial({ color: hexColor, transparent: true, opacity: 0.42, side: THREE.DoubleSide }));
-    inner.scale.set(0.85, 1.35, 1); g.add(inner);
+
+    const border = new THREE.Mesh(
+      new THREE.TorusGeometry(1.45, 0.15, 14, 36),
+      new THREE.MeshBasicMaterial({ color: hexColor })
+    );
+    border.scale.set(0.85, 1.35, 1);
+    g.add(border);
+
+    const surfaceMat = new THREE.MeshBasicMaterial({ map: rt.texture, side: THREE.DoubleSide });
+    const inner = new THREE.Mesh(new THREE.CircleGeometry(1.39, 32), surfaceMat);
+    inner.scale.set(0.85, 1.35, 1);
+    g.add(inner);
+
     g.visible = false;
     scene.add(g);
-    return { group: g, active: false, pos: new THREE.Vector3(), normal: new THREE.Vector3(0, 1, 0) };
+    const clipPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+    return { group: g, inner, surfaceMat, rt, cam, hexColor, clipPlane, active: false, pos: new THREE.Vector3(), normal: new THREE.Vector3(0, 0, 1) };
   }
-  const bluePortal = makePortalMesh(0x38bdf8);
-  const orangePortal = makePortalMesh(0xf97316);
+
+  const bluePortal = makePortalSystem(0x38bdf8);
+  const orangePortal = makePortalSystem(0xf97316);
+
+  function applyPortalTransform(p, px, py, pz, nx, ny, nz) {
+    p.pos.set(px, py, pz);
+    p.normal.set(nx, ny, nz).normalize();
+    p.group.position.copy(p.pos);
+    const upVec = Math.abs(p.normal.y) > 0.9 ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(0, 1, 0);
+    p.group.up.copy(upVec);
+    p.group.lookAt(p.pos.clone().add(p.normal));
+    p.group.updateMatrixWorld();
+    // Portalın arkasında kalan nesne parçalarını kesen (clipping) düzlem
+    p.clipPlane.setFromNormalAndCoplanarPoint(p.normal, p.pos.clone().addScaledVector(p.normal, -0.05));
+    p.group.visible = true;
+    p.active = true;
+  }
 
   function placePortal(isOrange) {
     raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
@@ -710,12 +754,105 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     spawnLaserBeam(startBeam, hit.point, isOrange ? 0xf97316 : 0x38bdf8);
     const p = isOrange ? orangePortal : bluePortal;
     const norm = hit.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize() : new THREE.Vector3(0, 1, 0);
-    p.pos.copy(hit.point).addScaledVector(norm, 0.2);
-    p.normal.copy(norm);
-    p.group.position.copy(p.pos);
-    p.group.lookAt(p.pos.clone().add(norm));
-    p.group.visible = true;
-    p.active = true;
+    const pos = hit.point.clone().addScaledVector(norm, 0.16);
+    applyPortalTransform(p, pos.x, pos.y, pos.z, norm.x, norm.y, norm.z);
+    if (isConnected) {
+      sendPacket({ type: 'placePortal', isOrange, x: pos.x, y: pos.y, z: pos.z, nx: norm.x, ny: norm.y, nz: norm.z });
+    }
+  }
+
+  const _pCamWorldPos = new THREE.Vector3();
+  const _pCamDir = new THREE.Vector3();
+  const _pLocalOffset = new THREE.Vector3();
+  const _pRotY180 = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
+
+  // Bir konum veya yönü kaynak portaldan hedef portala (180 derece dönüşle) dönüştürür
+  function transformPointBetweenPortals(worldPt, srcP, dstP) {
+    const rel = worldPt.clone().sub(srcP.pos);
+    const srcInvQ = srcP.group.quaternion.clone().invert();
+    rel.applyQuaternion(srcInvQ);
+    rel.applyQuaternion(_pRotY180);
+    rel.applyQuaternion(dstP.group.quaternion);
+    return dstP.pos.clone().add(rel);
+  }
+
+  function transformQuatBetweenPortals(worldQ, srcP, dstP) {
+    const srcInvQ = srcP.group.quaternion.clone().invert();
+    return dstP.group.quaternion.clone().multiply(_pRotY180).multiply(srcInvQ).multiply(worldQ);
+  }
+
+  function transformVecBetweenPortals(worldVec, srcP, dstP) {
+    const srcInvQ = srcP.group.quaternion.clone().invert();
+    return worldVec.clone().applyQuaternion(srcInvQ).applyQuaternion(_pRotY180).applyQuaternion(dstP.group.quaternion);
+  }
+
+  function updatePortalViews() {
+    if (!bluePortal.active || !orangePortal.active) {
+      if (bluePortal.active && bluePortal.surfaceMat.map !== null) {
+        bluePortal.surfaceMat.map = null;
+        bluePortal.surfaceMat.color.setHex(0x0a2540);
+        bluePortal.surfaceMat.needsUpdate = true;
+      }
+      if (orangePortal.active && orangePortal.surfaceMat.map !== null) {
+        orangePortal.surfaceMat.map = null;
+        orangePortal.surfaceMat.color.setHex(0x451a03);
+        orangePortal.surfaceMat.needsUpdate = true;
+      }
+      return;
+    }
+
+    if (bluePortal.surfaceMat.map !== bluePortal.rt.texture) {
+      bluePortal.surfaceMat.map = bluePortal.rt.texture;
+      bluePortal.surfaceMat.color.setHex(0xffffff);
+      bluePortal.surfaceMat.needsUpdate = true;
+    }
+    if (orangePortal.surfaceMat.map !== orangePortal.rt.texture) {
+      orangePortal.surfaceMat.map = orangePortal.rt.texture;
+      orangePortal.surfaceMat.color.setHex(0xffffff);
+      orangePortal.surfaceMat.needsUpdate = true;
+    }
+
+    camera.getWorldPosition(_pCamWorldPos);
+    camera.getWorldDirection(_pCamDir);
+
+    const prevFgVis = fingerGunGroup.visible;
+    const prevGhostVis = ghostMesh.visible;
+    const prevLocalRigVis = localRig.root.visible;
+    fingerGunGroup.visible = false;
+    ghostMesh.visible = false;
+    localRig.root.visible = true;
+
+    renderSinglePortalView(bluePortal, orangePortal);
+    renderSinglePortalView(orangePortal, bluePortal);
+
+    fingerGunGroup.visible = prevFgVis;
+    ghostMesh.visible = prevGhostVis;
+    localRig.root.visible = prevLocalRigVis;
+  }
+
+  function renderSinglePortalView(srcPortal, dstPortal) {
+    srcPortal.group.updateMatrixWorld();
+    dstPortal.group.updateMatrixWorld();
+
+    _pLocalOffset.copy(_pCamWorldPos).sub(srcPortal.pos);
+    const dist = Math.min(18, _pLocalOffset.length());
+    const worldOutDir = transformVecBetweenPortals(_pCamDir, srcPortal, dstPortal).normalize();
+
+    const pCam = srcPortal.cam;
+    pCam.position.copy(dstPortal.pos).addScaledVector(dstPortal.normal, 0.35);
+    pCam.up.copy(dstPortal.group.up);
+    pCam.lookAt(pCam.position.clone().add(worldOutDir).addScaledVector(dstPortal.normal, 0.2));
+    pCam.fov = THREE.MathUtils.clamp(75 - dist * 0.6, 50, 80);
+    pCam.updateProjectionMatrix();
+
+    srcPortal.inner.visible = false;
+    dstPortal.group.visible = false;
+    renderer.setRenderTarget(srcPortal.rt);
+    renderer.clear();
+    renderer.render(scene, pCam);
+    renderer.setRenderTarget(null);
+    srcPortal.inner.visible = true;
+    dstPortal.group.visible = true;
   }
 
   function spawnLaserBeam(startWorld, endWorld, colorHex) {
@@ -912,7 +1049,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
   })();
 
   const playerRadius = 0.8;
-  const playerBody = new CANNON.Body({ mass: 5, material: pm, allowSleep: false });
+  const playerBody = new CANNON.Body({ mass: 5, material: playerMat, linearDamping: 0.01, allowSleep: false });
   playerBody.addShape(new CANNON.Sphere(playerRadius));
   playerBody.position.set(0, 15, 8);
   playerBody.fixedRotation = true; playerBody.updateMassProperties();
@@ -934,7 +1071,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     for (const c of world.contacts) {
       if (c.bi.id === b.id || c.bj.id === b.id) {
         const up = c.bi.id === b.id ? -c.ni.y : c.ni.y;
-        if (up > 0.45) return true;
+        if (up > 0.35) return true;
       }
     }
     return false;
@@ -943,7 +1080,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     if (drivingCar || isShatteredLocal || jumpCooldown > 0) return;
     if (_0xV.getFly() || isBodyGrounded(playerBody)) {
       playerBody.velocity.y = 13 * (_0xV.getSpd() > 1 ? 1.2 : 1);
-      jumpCooldown = 0.15;
+      jumpCooldown = 0.18;
     }
   }
 
@@ -959,7 +1096,6 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
   }
   const marbleMesh = new THREE.Mesh(marbleGeo, makeMarbleMat(myColor));
   marbleMesh.castShadow = true; marbleMesh.visible = false; scene.add(marbleMesh);
-  const marbleDir = { x: 0, z: 0 };
   function setLocalMarbleColor() { marbleMesh.material.map.dispose(); marbleMesh.material.dispose(); marbleMesh.material = makeMarbleMat(myColor); }
   function applyCameraRig() {
     if (marbleMode) { camera.position.set(0, 1.5, 7); pitchObj.position.set(0, 0.3, 0); }
@@ -970,7 +1106,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     if (on === marbleMode) return;
     marbleMode = on;
     const b = playerBody;
-    b.fixedRotation = !on; b.material = on ? marbleMat : pm;
+    b.fixedRotation = !on; b.material = on ? marbleMat : playerMat;
     b.updateMassProperties(); b.angularVelocity.set(0, 0, 0);
     if (!on) b.quaternion.set(0, 0, 0, 1);
     applyCameraRig(); syncPlayerState(true);
@@ -980,7 +1116,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
   const activeCars = {};
   let drivingCar = null;
   const CAR_Y = 1.15;
-  const tmpQ = new THREE.Quaternion(), tmpQ2 = new THREE.Quaternion();
+  const tmpQ = new THREE.Quaternion();
 
   function createCarObject(id, data) {
     if (activeCars[id]) return activeCars[id];
@@ -1175,13 +1311,22 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     const t = PROP_TYPES[type];
     const isStatic = !t.m;
     const color = t.fixedColor || (t.bounce ? '#a855f7' : (isHex(d.color) ? d.color : '#ffffff'));
-    const mesh = new THREE.Mesh(propGeo(type), new THREE.MeshStandardMaterial({ color, roughness: 0.5 }));
+    const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.5 });
+    const mesh = new THREE.Mesh(propGeo(type), mat);
     mesh.castShadow = mesh.receiveShadow = true; mesh.position.set(d.x, d.y, d.z);
     if (d.qx !== undefined) mesh.quaternion.set(d.qx, d.qy, d.qz, d.qw);
     mesh.userData = { isProp: true, id }; scene.add(mesh); intersectableObjects.push(mesh);
 
+    // Dinamik nesneler portalın yarısındayken karşı portaldan çıkan ikiz kopyası (portalClone)
+    let portalClone = null;
+    if (!isStatic) {
+      portalClone = new THREE.Mesh(propGeo(type), mat.clone());
+      portalClone.castShadow = true;
+      portalClone.visible = false;
+      scene.add(portalClone);
+    }
+
     const shape = t.s === 'ball' ? new CANNON.Sphere(t.r) : new CANNON.Box(new CANNON.Vec3(t.h[0], t.h[1], t.h[2]));
-    // STABİL FİZİK: Yüksek angularDamping (0.72) ve linearDamping (0.28) ile blokların çıldırıp fırıldak gibi dönmesi engellendi
     const body = new CANNON.Body({
       mass: isStatic ? 0 : t.m,
       type: isStatic ? CANNON.Body.STATIC : CANNON.Body.DYNAMIC,
@@ -1194,11 +1339,11 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     body.quaternion.set(mesh.quaternion.x, mesh.quaternion.y, mesh.quaternion.z, mesh.quaternion.w);
     syncBodyAABB(body); world.addBody(body);
 
-    const p = { id, propType: type, mesh, body, isStatic };
+    const boundR = t.s === 'ball' ? t.r : Math.max(t.h[0], t.h[1], t.h[2]);
+    const p = { id, propType: type, mesh, portalClone, boundR, body, isStatic, portalCd: 0 };
     activeProps[id] = p; return p;
   }
 
-  // STABİL KUVVET FONKSİYONU: Tork patlamasını önlemek için kuvveti kütle merkezinden kontrollü uygular
   function applyControlledPush(body, fx, fy, fz) {
     if (!body) return;
     body.wakeUp();
@@ -1215,6 +1360,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     const p = activeProps[id]; if (!p) return;
     if (grabbedProp === p) grabbedProp = null;
     scene.remove(p.mesh); p.mesh.material.dispose();
+    if (p.portalClone) { scene.remove(p.portalClone); p.portalClone.material.dispose(); }
     const i = intersectableObjects.indexOf(p.mesh); if (i > -1) intersectableObjects.splice(i, 1);
     if (p.body) world.removeBody(p.body); delete activeProps[id];
   }
@@ -1295,7 +1441,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     $('spawnBtnMobile').addEventListener('touchstart', (e) => { e.preventDefault(); spawnObject(selectedObj); }, { passive: false });
   })();
 
-  let socket = null, udpSocket = null, udpHost = '127.0.0.1', udpPort = 3000;
+  let socket = null, udpSocket = null;
   let isConnected = false, lastSyncTime = 0;
   const remotePlayers = {};
 
@@ -1376,7 +1522,27 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
         (msg.players || []).forEach((p) => p.id !== _uid && updateOrCreateRemotePlayer(p));
         (msg.props || []).forEach((p) => spawnPropVisual(p.id, p));
         (msg.cars || []).forEach((c) => { const car = createCarObject(c.id, c); if (drivingCar !== car) applyRemoteCarState(car, c); });
+        if (msg.portals) {
+          if (msg.portals.blue) applyPortalTransform(bluePortal, msg.portals.blue.x, msg.portals.blue.y, msg.portals.blue.z, msg.portals.blue.nx, msg.portals.blue.ny, msg.portals.blue.nz);
+          if (msg.portals.orange) applyPortalTransform(orangePortal, msg.portals.orange.x, msg.portals.orange.y, msg.portals.orange.z, msg.portals.orange.nx, msg.portals.orange.ny, msg.portals.orange.nz);
+        }
         break;
+      case 'placePortal': {
+        const targetP = msg.isOrange ? orangePortal : bluePortal;
+        applyPortalTransform(targetP, msg.x, msg.y, msg.z, msg.nx, msg.ny, msg.nz);
+        break;
+      }
+      case 'teleportProp': {
+        const p = activeProps[msg.id];
+        if (p && p.body && !p.isStatic) {
+          p.body.wakeUp();
+          p.body.position.set(msg.x, msg.y, msg.z);
+          if (msg.vx !== undefined) p.body.velocity.set(msg.vx, msg.vy, msg.vz);
+          if (msg.qx !== undefined) p.body.quaternion.set(msg.qx, msg.qy, msg.qz, msg.qw);
+          p.portalCd = 0.6;
+        }
+        break;
+      }
       case 'playerUpdate': if (msg.id !== _uid) updateOrCreateRemotePlayer(msg); break;
       case 'playerLeave': removeRemotePlayer(msg.id); break;
       case 'adminStatus':
@@ -1552,7 +1718,6 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     const aim = new THREE.Vector3(); camera.getWorldDirection(aim);
     const startBeam = fingerTipLocalPos.clone(); fingerGunGroup.localToWorld(startBeam);
 
-    // GRAVITY GUN: Tutulan objeyi kontrollü fırlatma
     if (mode.id === 'gravity' && grabbedProp) {
       const p = grabbedProp;
       grabbedProp = null;
@@ -1683,7 +1848,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
   });
   _d.addEventListener('wheel', (e) => {
     if (grabbedProp) {
-      grabDistance = Math.max(3, Math.min(18, grabDistance - Math.sign(e.deltaY) * 1.0));
+      grabDistance = Math.max(2.2, Math.min(18, grabDistance - Math.sign(e.deltaY) * 0.9));
     }
   });
   _d.addEventListener('mousedown', (e) => {
@@ -1793,6 +1958,53 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
   const clock = new THREE.Clock();
   let frames = 0, fpsTimer = 0;
 
+  // Oyuncu portaldan geçtiğinde hızını ve bakış açısını hedef portala aktarır
+  function teleportPlayerThroughPortal(srcPortal, dstPortal) {
+    const out = dstPortal.pos.clone().addScaledVector(dstPortal.normal, 1.45);
+    playerBody.position.set(out.x, out.y + 0.3, out.z);
+    const spd = Math.max(11, Math.hypot(playerBody.velocity.x, playerBody.velocity.y, playerBody.velocity.z));
+    playerBody.velocity.set(
+      dstPortal.normal.x * spd * 0.9,
+      Math.max(4.5, dstPortal.normal.y * spd * 0.9),
+      dstPortal.normal.z * spd * 0.9
+    );
+    if (Math.hypot(dstPortal.normal.x, dstPortal.normal.z) > 0.2) {
+      yawObj.rotation.y = Math.atan2(-dstPortal.normal.x, -dstPortal.normal.z);
+    }
+    portalCooldown = 0.55;
+    syncPlayerState(true);
+  }
+
+  // Dinamik nesneler (kutu, top, varil vb.) portaldan geçtiğinde hız ve açılarını koruyarak diğer portaldan çıkarır
+  function teleportPropThroughPortal(p, srcPortal, dstPortal) {
+    if (grabbedProp === p) grabbedProp = null;
+    const b = p.body;
+    const outPos = dstPortal.pos.clone().addScaledVector(dstPortal.normal, p.boundR + 0.55);
+    const inVel = new THREE.Vector3(b.velocity.x, b.velocity.y, b.velocity.z);
+    const spd = Math.max(10, inVel.length());
+    const outVel = dstPortal.normal.clone().multiplyScalar(spd * 0.95);
+    if (outVel.y < 3) outVel.y += 3;
+
+    const curQ = new THREE.Quaternion(b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w);
+    const outQ = transformQuatBetweenPortals(curQ, srcPortal, dstPortal);
+
+    b.wakeUp();
+    b.position.set(outPos.x, outPos.y, outPos.z);
+    b.velocity.set(outVel.x, outVel.y, outVel.z);
+    b.quaternion.set(outQ.x, outQ.y, outQ.z, outQ.w);
+    p.portalCd = 0.55;
+
+    if (isConnected) {
+      sendPacket({
+        type: 'teleportProp',
+        id: p.id,
+        x: outPos.x, y: outPos.y, z: outPos.z,
+        vx: outVel.x, vy: outVel.y, vz: outVel.z,
+        qx: outQ.x, qy: outQ.y, qz: outQ.z, qw: outQ.w
+      });
+    }
+  }
+
   function animate() {
     requestAnimationFrame(animate);
     const raw = clock.getDelta(), dt = Math.min(raw, 0.05);
@@ -1803,7 +2015,6 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
 
     mapStatues.forEach((st) => { st.rig.root.rotation.y += dt * 0.9; });
 
-    // Haritadaki Rastgele Loot ve Silahların Dönüşü & Otomatik Toplanması
     worldPickups.forEach((pk) => {
       if (!pk.active) return;
       pk.model.rotation.y += dt * 1.6;
@@ -1813,7 +2024,6 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
       }
     });
 
-    // Gravity Gun ile tutulan objeyi kameranın önünde stabil taşıma
     if (grabbedProp && grabbedProp.body && !grabbedProp.isStatic) {
       const aim = new THREE.Vector3(); camera.getWorldDirection(aim);
       const holdPos = new THREE.Vector3(playerBody.position.x, playerBody.position.y + 0.9, playerBody.position.z).addScaledVector(aim, grabDistance);
@@ -1824,20 +2034,6 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
         (holdPos.z - grabbedProp.body.position.z) * 12
       );
       grabbedProp.body.angularVelocity.set(0, 0, 0);
-    }
-
-    // Portal Işınlanma Kontrolü (Mavi <-> Turuncu)
-    if (bluePortal.active && orangePortal.active && portalCooldown <= 0 && !drivingCar) {
-      const pPos = new THREE.Vector3(playerBody.position.x, playerBody.position.y, playerBody.position.z);
-      if (pPos.distanceTo(bluePortal.pos) < 1.9) {
-        const out = orangePortal.pos.clone().addScaledVector(orangePortal.normal, 2.5);
-        playerBody.position.set(out.x, out.y + 0.6, out.z);
-        portalCooldown = 0.85;
-      } else if (pPos.distanceTo(orangePortal.pos) < 1.9) {
-        const out = bluePortal.pos.clone().addScaledVector(bluePortal.normal, 2.5);
-        playerBody.position.set(out.x, out.y + 0.6, out.z);
-        portalCooldown = 0.85;
-      }
     }
 
     for (const id in activeCars) {
@@ -1867,9 +2063,30 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
       }
     }
 
+    if (isPlaying && !isShatteredLocal && !drivingCar && !marbleMode) {
+      if (activeActions.jump) tryJump();
+      if (_0xV.getFly() && !activeActions.jump) playerBody.velocity.y = 0;
+      const spdM = _0xV.getSpd();
+      const mv = new THREE.Vector3(-steer, 0, -throttle);
+      if (mv.lengthSq() > 0) {
+        mv.normalize();
+        mv.applyAxisAngle(new THREE.Vector3(0, 1, 0), yawObj.rotation.y);
+        walkBobTimer += dt * 9 * spdM;
+      } else {
+        walkBobTimer = 0;
+      }
+      const targetVx = mv.x * 15 * spdM;
+      const targetVz = mv.z * 15 * spdM;
+      const accel = Math.min(1, dt * 16);
+      playerBody.velocity.x += (targetVx - playerBody.velocity.x) * accel;
+      playerBody.velocity.z += (targetVz - playerBody.velocity.z) * accel;
+    }
+
     world.step(1 / 60, dt, 3);
     updateRagdolls(dt);
     if (localRagdoll) { playerObj.position.copy(localRagdoll.torso.position); syncPlayerState(); }
+
+    const portalsReady = bluePortal.active && orangePortal.active;
 
     if (isPlaying && !isShatteredLocal) {
       if (drivingCar) {
@@ -1877,24 +2094,47 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
         vehiclePrompt.innerText = `Sürüş — İn: [${keybinds.interactCar.toUpperCase()}]`;
         playerObj.position.copy(drivingCar.body.position); syncPlayerState();
       } else {
-        if (activeActions.jump) tryJump();
-        if (_0xV.getFly() && !activeActions.jump) playerBody.velocity.y = 0;
         if (playerBody.position.y < -30) { playerBody.position.set(0, 15, 8); playerBody.velocity.set(0, 0, 0); }
         if (playerBody.velocity.y < -45) playerBody.velocity.y = -45;
-        const spdM = _0xV.getSpd();
-        const mv = new THREE.Vector3(-steer, 0, -throttle);
-        if (mv.lengthSq() > 0) {
-          mv.normalize(); mv.applyAxisAngle(new THREE.Vector3(0, 1, 0), yawObj.rotation.y);
-          walkBobTimer += dt * 10 * spdM;
-        }
-        mv.multiplyScalar(15 * spdM);
-        playerBody.velocity.x = mv.x; playerBody.velocity.z = mv.z;
         playerObj.position.copy(playerBody.position);
 
+        const moveSpd = Math.hypot(playerBody.velocity.x, playerBody.velocity.z);
         localRig.root.visible = thirdPerson && !marbleMode;
         localRig.root.position.set(playerBody.position.x, playerBody.position.y - playerRadius, playerBody.position.z);
         localRig.root.rotation.y = yawObj.rotation.y;
-        animateHumanoidRig(localRig, Math.hypot(playerBody.velocity.x, playerBody.velocity.z), dt, true);
+        animateHumanoidRig(localRig, moveSpd, dt, true);
+
+        // OYUNCU PORTAL YARI-KESİT (SPLIT-MESH) & GEÇİŞ KONTROLÜ
+        localPortalCloneRig.root.visible = false;
+        setGroupClippingPlane(localRig.root, []);
+
+        if (portalsReady) {
+          const pPos = new THREE.Vector3(playerBody.position.x, playerBody.position.y, playerBody.position.z);
+          const dBlue = pPos.distanceTo(bluePortal.pos);
+          const dOrange = pPos.distanceTo(orangePortal.pos);
+          const nearP = dBlue < dOrange ? bluePortal : orangePortal;
+          const farP  = dBlue < dOrange ? orangePortal : bluePortal;
+          const minDist = Math.min(dBlue, dOrange);
+
+          if (minDist < 2.2) {
+            const relVec = pPos.clone().sub(nearP.pos);
+            const normalDist = relVec.dot(nearP.normal);
+
+            // Oyuncu portal ağzına yarı yarıya girdiğinde: duvar arkasını kes ve karşı portalda yarısını göster
+            setGroupClippingPlane(localRig.root, [nearP.clipPlane]);
+            setGroupClippingPlane(localPortalCloneRig.root, [farP.clipPlane]);
+
+            const cloneFootPos = transformPointBetweenPortals(localRig.root.position, nearP, farP);
+            localPortalCloneRig.root.position.copy(cloneFootPos);
+            localPortalCloneRig.root.rotation.y = yawObj.rotation.y + Math.PI;
+            animateHumanoidRig(localPortalCloneRig, moveSpd, dt, true);
+            localPortalCloneRig.root.visible = true;
+
+            if (normalDist < 0.72 && portalCooldown <= 0) {
+              teleportPlayerThroughPortal(nearP, farP);
+            }
+          }
+        }
 
         const nearStatue = findNearestStatue();
         if (grabbedProp) {
@@ -1930,16 +2170,51 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
       c.group.position.copy(c.body.position); c.group.quaternion.copy(c.body.quaternion);
     }
 
-    // STABİL DÖNÜŞ SINIRLAYICI: Hiçbir obje saniyede 4.5 radyandan hızlı dönemez (Çıldırmayı %100 keser)
+    // NESNELERİN PORTALLARDAN GEÇİŞİ VE YARI-KESİT (SPLIT-MESH) KONTROLÜ
     for (const id in activeProps) {
       const p = activeProps[id]; if (p.isStatic) continue;
+      if (p.portalCd > 0) p.portalCd -= dt;
+
       const av = p.body.angularVelocity;
       const avLen = Math.hypot(av.x, av.y, av.z);
       if (avLen > 4.5) {
         const s = 4.5 / avLen;
         av.x *= s; av.y *= s; av.z *= s;
       }
-      p.mesh.position.copy(p.body.position); p.mesh.quaternion.copy(p.body.quaternion);
+      p.mesh.position.copy(p.body.position);
+      p.mesh.quaternion.copy(p.body.quaternion);
+
+      if (p.portalClone) p.portalClone.visible = false;
+      p.mesh.material.clippingPlanes = [];
+
+      if (portalsReady) {
+        const pos = p.mesh.position;
+        const dB = pos.distanceTo(bluePortal.pos);
+        const dO = pos.distanceTo(orangePortal.pos);
+        const srcP = dB < dO ? bluePortal : orangePortal;
+        const dstP = dB < dO ? orangePortal : bluePortal;
+        const dist = Math.min(dB, dO);
+
+        // Nesne portala yaklaştığında / yarısı içindeyken
+        if (dist < p.boundR + 1.45) {
+          const rel = pos.clone().sub(srcP.pos);
+          const normalDist = rel.dot(srcP.normal);
+
+          // Nesnenin duvar arkasına geçen kısmını kes ve karşı portaldan çıkan yarısını çiz
+          p.mesh.material.clippingPlanes = [srcP.clipPlane];
+          if (p.portalClone) {
+            p.portalClone.material.clippingPlanes = [dstP.clipPlane];
+            p.portalClone.position.copy(transformPointBetweenPortals(pos, srcP, dstP));
+            p.portalClone.quaternion.copy(transformQuatBetweenPortals(p.mesh.quaternion, srcP, dstP));
+            p.portalClone.visible = true;
+          }
+
+          // Nesnenin merkezi portal düzlemini geçtiyse tamamen karşı portala ışınla
+          if (normalDist < 0.65 && p.portalCd <= 0) {
+            teleportPropThroughPortal(p, srcP, dstP);
+          }
+        }
+      }
     }
 
     for (const id in remotePlayers) {
@@ -1955,6 +2230,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
       syncBodyAABB(rp.body);
     }
 
+    updatePortalViews();
     renderer.render(scene, camera);
   }
 
