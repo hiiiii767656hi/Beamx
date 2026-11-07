@@ -58,18 +58,16 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
 <body>
 <div id="startScreen" class="flex flex-col items-center justify-center bg-gray-950 no-select px-4 py-6">
   <h1 class="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-fuchsia-500 mb-1 text-center tracking-tighter">PHYSICS SANDBOX</h1>
-  <p class="text-sm md:text-base text-fuchsia-300 mb-4 tracking-widest uppercase font-semibold text-center">Gravity Gun &amp; Portal Gun Destekli 🛡️</p>
+  <p class="text-sm md:text-base text-fuchsia-300 mb-4 tracking-widest uppercase font-semibold text-center">Gravity Gun &amp; Portal Gun Haritada Bulunabilir! 🛡️</p>
 
   <div class="w-96 max-w-full bg-black/80 border-2 border-cyan-500/50 rounded-xl p-3.5 mb-3">
     <div class="flex items-center justify-between mb-2.5">
       <span class="text-xs uppercase tracking-wider text-cyan-300 font-bold">👤 Anonim Oyuncu Kimliği</span>
       <span id="userAuthBadge" class="text-xs px-2.5 py-0.5 rounded bg-cyan-950 text-cyan-300 font-mono font-bold">Anon_0000</span>
     </div>
-
     <button id="anonLoginBtn" type="button" class="w-full flex items-center justify-center gap-2 py-2.5 px-3 bg-gray-800 hover:bg-gray-700 text-cyan-300 border border-cyan-500/40 font-bold rounded-lg text-xs cursor-pointer mb-2.5">
       <span>🎲</span> Yeni Anonim Kimlik Oluştur
     </button>
-
     <details class="text-xs text-gray-400">
       <summary class="cursor-pointer text-yellow-400 font-semibold select-none">👑 Yetkili (Admin) Girişi</summary>
       <div class="flex gap-1.5 mt-2">
@@ -96,7 +94,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     <div id="savedServers" class="flex flex-wrap gap-2 w-full"></div>
   </div>
 
-  <p id="authStatus" class="text-gray-400 mb-4 font-mono text-xs text-center">Anonim kimliğiniz hazır. Connect veya Enter Playground'a basın.</p>
+  <p id="authStatus" class="text-gray-400 mb-4 font-mono text-xs text-center">Haritada silahları bulmak için etrafa bakın! [E] tuşu ile alabilirsiniz.</p>
 
   <div class="flex flex-wrap gap-3 justify-center">
     <button id="playBtn" type="button" class="px-9 py-3.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold rounded-full text-lg border-2 border-cyan-300 shadow-[0_0_20px_rgba(6,182,212,0.5)] cursor-pointer">ENTER PLAYGROUND</button>
@@ -108,7 +106,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
   <div class="flex gap-2 flex-wrap">
     <button id="buildBtn" type="button" class="ui-btn text-xs" style="border-color:#34d399">🧱 Objeler (B)</button>
     <button id="randomPropBtn" type="button" class="ui-btn text-xs" style="border-color:#f43f5e">🎲 Rastgele (G)</button>
-    <button id="fingerModeBtn" type="button" class="ui-btn text-xs" style="border-color:#fbbf24">🔫 Silah: Gravity</button>
+    <button id="fingerModeBtn" type="button" class="ui-btn text-xs" style="border-color:#fbbf24">🌀 Silah: Gravity</button>
     <button id="camViewBtn" type="button" class="ui-btn text-xs" style="border-color:#38bdf8">🎥 Kamera (C)</button>
     <button id="spawnCarBtn" type="button" class="ui-btn text-xs" style="border-color:#e879f9">Araba 🚗</button>
     <button id="ragdollBtn" type="button" class="ui-btn text-xs" style="border-color:#a855f7">Ragdoll (R)</button>
@@ -131,12 +129,12 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
   Kimlik: <b id="hudUserName" class="text-cyan-300">Anonim</b> · Kostüm: <b id="hudSkinName" class="text-fuchsia-300">Klasik</b> · Silah: <b id="hudWeaponName" class="text-amber-300">🌀 Gravity Gun</b>
 </div>
 
+<!-- ADMIN MODAL -->
 <div id="adminModal" class="no-select">
   <div class="modal-header" style="color:#facc15;border-color:rgba(250,204,21,.3)">
     <span>👑 Yetkili Admin Paneli</span>
     <span id="adminBadge" class="text-xs px-2 py-0.5 rounded bg-emerald-800 text-emerald-200 font-bold">👑 Yetkili</span>
   </div>
-
   <div class="text-xs font-bold text-yellow-300 mb-2 uppercase">⚡ Yetkili Güçleri</div>
   <div class="grid grid-cols-2 gap-2 mb-3">
     <button id="admGodBtn" type="button" class="py-2 bg-gray-800 hover:bg-gray-700 border border-yellow-500/40 rounded font-bold text-xs cursor-pointer">🛡️ Ölümsüzlük: KAPALI</button>
@@ -144,44 +142,23 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     <button id="admSpeedBtn" type="button" class="py-2 bg-gray-800 hover:bg-gray-700 border border-fuchsia-500/40 rounded font-bold text-xs cursor-pointer">⚡ Süper Hız: 1x</button>
     <button id="admHealSelfBtn" type="button" class="py-2 bg-emerald-700 hover:bg-emerald-600 rounded font-bold text-xs cursor-pointer">❤️ Canımı Fullle (100)</button>
   </div>
-
   <div class="text-xs font-bold text-cyan-300 mb-2 uppercase">👥 Oyuncu Yönetimi</div>
   <div id="adminPlayerList" class="space-y-1.5 max-h-40 overflow-y-auto mb-3 bg-black/40 p-2 rounded border border-gray-800 text-xs"></div>
-
-  <div class="text-xs font-bold text-pink-300 mb-2 uppercase">🌍 Sunucu Komutları</div>
-  <div class="grid grid-cols-2 gap-2 mb-3">
-    <button id="admHealAllBtn" type="button" class="py-1.5 bg-teal-700 hover:bg-teal-600 rounded font-bold text-xs cursor-pointer">💚 Herkesi İyileştir</button>
-    <button id="admKillAllBtn" type="button" class="py-1.5 bg-red-800 hover:bg-red-700 rounded font-bold text-xs cursor-pointer">💀 Herkesi Parçala</button>
-  </div>
-  <div class="flex gap-2 mb-3">
-    <input id="admAnnounceInput" type="text" placeholder="Sunucu duyuru mesajı..." class="flex-grow px-2 py-1.5 bg-gray-900 border border-gray-700 rounded text-xs">
-    <button id="admAnnounceBtn" type="button" class="px-3 py-1.5 bg-pink-600 hover:bg-pink-500 rounded font-bold text-xs cursor-pointer">📢 Duyur</button>
-  </div>
-
   <button id="closeAdminBtn" type="button" class="w-full py-2 bg-gray-700 hover:bg-gray-600 rounded font-bold text-sm cursor-pointer">Kapat</button>
 </div>
 
 <div id="settingsModal" class="no-select">
   <div class="modal-header"><span>⚙️ Oyun Ayarları</span><span id="fpsCounter" class="text-xs font-mono text-emerald-400">60 FPS</span></div>
-  <div class="setting-row flex items-center justify-between"><span class="text-sm font-semibold">Kıyafet &amp; Eldiven Rengi</span><input type="color" id="playerColorPicker" class="w-10 h-8 rounded cursor-pointer bg-transparent"></div>
+  <div class="setting-row flex items-center justify-between"><span class="text-sm font-semibold">Kıyafet Rengi</span><input type="color" id="playerColorPicker" class="w-10 h-8 rounded cursor-pointer bg-transparent"></div>
   <div class="setting-row">
     <div class="setting-label"><span>Karakter Modeli</span></div>
     <select id="skinSelect" class="w-full bg-gray-900 border border-cyan-500/50 rounded p-1.5 text-xs text-white">
       <option value="default">🧑 Klasik Maceracı</option>
-      <option value="knight">🤖 Siber Şövalye (Neon Kule)</option>
-      <option value="astro">👩‍🚀 Astronot (Uçan Adalar)</option>
-      <option value="ninja">🥷 Neon Ninja (Gökdelenler)</option>
-      <option value="soldier">🪖 Taktik Asker (Yarış Pisti)</option>
+      <option value="knight">🤖 Siber Şövalye</option>
+      <option value="astro">👩‍🚀 Astronot</option>
+      <option value="ninja">🥷 Neon Ninja</option>
+      <option value="soldier">🪖 Taktik Asker</option>
     </select>
-  </div>
-  <div class="setting-row"><div class="setting-label"><span>Kamera Hassasiyeti</span><span id="sensVal">1.0x</span></div><input type="range" id="sensSlider" min="0.2" max="3" step="0.1" value="1" class="w-full accent-cyan-400"></div>
-  <div class="setting-row"><div class="setting-label"><span>Görüş Açısı (FOV)</span><span id="fovVal">75°</span></div><input type="range" id="fovSlider" min="60" max="110" step="1" value="75" class="w-full accent-cyan-400"></div>
-  <label class="flex items-center space-x-3 cursor-pointer mb-2 text-sm"><input type="checkbox" id="ragdollToggle" checked class="w-4 h-4"><span>Vurulunca Ragdoll</span></label>
-  <label class="flex items-center space-x-3 cursor-pointer mb-2 text-sm"><input type="checkbox" id="shadowsToggle" checked class="w-4 h-4"><span>Gölgeler</span></label>
-  <label class="flex items-center space-x-3 cursor-pointer mb-3 text-sm"><input type="checkbox" id="ghostToggle" checked class="w-4 h-4"><span>Obje Önizlemesi (Ghost)</span></label>
-  <div class="grid grid-cols-2 gap-2 mb-3">
-    <button id="openKeybindsFromSettings" type="button" class="py-2 bg-indigo-700 rounded font-bold text-xs cursor-pointer">⌨️ Tuş Atamaları</button>
-    <button id="respawnBtn" type="button" class="py-2 bg-amber-600 rounded font-bold text-xs cursor-pointer">🔄 Yeniden Doğ</button>
   </div>
   <button id="closeSettingsBtn" type="button" class="w-full py-2 bg-gray-700 rounded font-bold text-sm cursor-pointer">Kapat</button>
 </div>
@@ -189,26 +166,16 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
 <div id="keybindsModal" class="no-select">
   <div class="modal-header"><span>⌨️ Tuş Atamaları</span><button id="resetKeybindsBtn" type="button" class="text-xs text-amber-300 underline cursor-pointer">Sıfırla</button></div>
   <div id="keybindsList" class="mb-4"></div>
-  <button id="closeKeybindsBtn" class="w-full py-2 bg-gray-700 rounded font-bold text-sm cursor-pointer">Kapat</button>
+  <button id="closeKeybindsBtn" type="button" class="w-full py-2 bg-gray-700 rounded font-bold text-sm cursor-pointer">Kapat</button>
 </div>
 
 <div id="buildMenu" class="no-select">
   <div class="modal-header" style="color:#34d399;border-color:rgba(52,211,153,.3)">
-    <span>🧱 Obje &amp; Rampa Menüsü</span>
+    <span>🧱 Obje Menüsü</span>
     <button id="closeBuildBtn" type="button" class="text-xs text-gray-300 hover:text-white cursor-pointer">✕</button>
   </div>
-  <div class="grid grid-cols-2 gap-2 mb-3">
-    <button id="menuRandomSingleBtn" type="button" class="py-2 bg-pink-600 hover:bg-pink-500 rounded font-bold text-xs cursor-pointer">🎲 Rastgele Eşya (G)</button>
-    <button id="menuRandomRainBtn" type="button" class="py-2 bg-purple-600 hover:bg-purple-500 rounded font-bold text-xs cursor-pointer">🌧️ 5 Eşya Yağdır!</button>
-  </div>
-  <div class="text-xs font-bold text-cyan-300 mb-2 uppercase">📐 Rampalar &amp; Yapılar</div>
   <div id="buildGridStatic" class="grid grid-cols-2 gap-2 mb-3"></div>
-  <div class="text-xs font-bold text-amber-300 mb-2 uppercase">🎲 Fiziksel &amp; Rastgele Eşyalar</div>
   <div id="buildGridDynamic" class="grid grid-cols-2 gap-2 mb-3"></div>
-  <div class="flex gap-2 mb-2">
-    <button id="spawnSelectedBtn" type="button" class="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 rounded font-bold text-xs cursor-pointer">➕ Seçileni Koy (Q)</button>
-    <button id="deleteAimedBtn" type="button" class="py-2 px-3 bg-amber-700 hover:bg-amber-600 rounded font-bold text-xs cursor-pointer">Sil (X)</button>
-  </div>
   <button id="clearPropsBtn" type="button" class="w-full py-2 bg-red-700 hover:bg-red-600 rounded font-bold text-xs cursor-pointer">🗑 Tüm Objeleri Temizle</button>
 </div>
 
@@ -251,16 +218,9 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
 
   let _uid = 'Anon_' + Math.random().toString(36).substring(2, 6);
   let _admPw = '';
-  const _syncAnonUI = () => {
-    $('userAuthBadge').textContent = '👤 ' + _uid;
-    $('hudUserName').textContent = _uid;
-  };
+  const _syncAnonUI = () => { $('userAuthBadge').textContent = '👤 ' + _uid; $('hudUserName').textContent = _uid; };
   _syncAnonUI();
-
-  $('anonLoginBtn').addEventListener('click', () => {
-    _uid = 'Anon_' + Math.random().toString(36).substring(2, 6);
-    _syncAnonUI();
-  });
+  $('anonLoginBtn').addEventListener('click', () => { _uid = 'Anon_' + Math.random().toString(36).substring(2, 6); _syncAnonUI(); });
 
   const isTouch = matchMedia('(pointer:coarse)').matches;
   let isPlaying = false, isShatteredLocal = false, ragdollEnabled = true, showGhost = true, lookSensitivity = 1, invertY = false, thirdPerson = false;
@@ -289,55 +249,10 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
   const r2 = (v, k) => Math.round(v * k) / k;
   const ragPose = (r) => r.parts.map(({ body: b }) => [r2(b.position.x, 100), r2(b.position.y, 100), r2(b.position.z, 100), r2(b.quaternion.x, 1000), r2(b.quaternion.y, 1000), r2(b.quaternion.z, 1000), r2(b.quaternion.w, 1000)]);
 
-  const DEFAULT_KEYS = {
-    forward: 'w', backward: 's', left: 'a', right: 'd',
-    jump: 'space', interactCar: 'e', ragdoll: 'r', marble: 'm',
-    buildMenu: 'b', quickSpawn: 'q', randomSpawn: 'g', fingerMode: 'v',
-    camView: 'c', adminMenu: 'p', rotateObj: 't', deleteObj: 'x',
-    fullscreen: 'f', keybinds: 'k'
-  };
-  const KEY_LABELS = {
-    forward: 'İleri Hareket / Gaz', backward: 'Geri Hareket / Fren', left: 'Sola Dönüş', right: 'Sağa Dönüş',
-    jump: 'Zıpla / El Freni', interactCar: 'Araca Bin / Kostüm Kuşan (E)', ragdoll: 'Ragdoll / Aracı Düzelt',
-    camView: '1./3. Şahıs Kamera', adminMenu: '👑 Admin Menüsü (Sadece Yetkili)',
-    buildMenu: 'Obje Menüsü', quickSpawn: 'Seçili Objeyi Koy', randomSpawn: '🎲 Rastgele Eşya At',
-    fingerMode: '🔫 Silah Modunu Değiştir (V)', rotateObj: 'Objeyi 45° Döndür', deleteObj: 'Baktığın Objeyi Sil',
-    marble: 'Marble Modu', fullscreen: 'Tam Ekran', keybinds: 'Tuş Atamaları'
-  };
+  const DEFAULT_KEYS = { forward: 'w', backward: 's', left: 'a', right: 'd', jump: 'space', interactCar: 'e', ragdoll: 'r', marble: 'm', buildMenu: 'b', quickSpawn: 'q', randomSpawn: 'g', fingerMode: 'v', camView: 'c', adminMenu: 'p', rotateObj: 't', deleteObj: 'x', fullscreen: 'f', keybinds: 'k' };
   let keybinds = Object.assign({}, DEFAULT_KEYS);
   try { Object.assign(keybinds, JSON.parse(localStorage.getItem('sandbox_keybinds') || '{}')); } catch (e) {}
   function saveKeybinds() { try { localStorage.setItem('sandbox_keybinds', JSON.stringify(keybinds)); } catch (e) {} }
-  let listeningKeyAction = null;
-  function renderKeybindsModal() {
-    const list = $('keybindsList'); list.innerHTML = '';
-    for (const act in KEY_LABELS) {
-      const row = _d.createElement('div'); row.className = 'kb-row';
-      const lbl = _d.createElement('span'); lbl.textContent = KEY_LABELS[act];
-      const btn = _d.createElement('button');
-      btn.type = 'button';
-      btn.className = 'kb-btn' + (listeningKeyAction === act ? ' listening' : '');
-      btn.textContent = listeningKeyAction === act ? 'Tuşa basın...' : keybinds[act].toUpperCase();
-      btn.onclick = () => { listeningKeyAction = act; renderKeybindsModal(); };
-      row.appendChild(lbl); row.appendChild(btn); list.appendChild(row);
-    }
-  }
-  function toggleKeybindsModal() {
-    listeningKeyAction = null;
-    const open = keybindsModal.style.display !== 'block';
-    keybindsModal.style.display = open ? 'block' : 'none';
-    if (open) { settingsModal.style.display = 'none'; renderKeybindsModal(); if (_d.pointerLockElement) _d.exitPointerLock(); }
-  }
-  $('keybindsBtn').addEventListener('click', toggleKeybindsModal);
-  $('openKeybindsFromSettings').addEventListener('click', toggleKeybindsModal);
-  $('closeKeybindsBtn').addEventListener('click', () => { listeningKeyAction = null; keybindsModal.style.display = 'none'; });
-  $('resetKeybindsBtn').addEventListener('click', () => { keybinds = Object.assign({}, DEFAULT_KEYS); saveKeybinds(); renderKeybindsModal(); });
-
-  function toggleFullscreen() {
-    const d = _d.documentElement, fs = _d.fullscreenElement || _d.webkitFullscreenElement;
-    if (!fs) (d.requestFullscreen || d.webkitRequestFullscreen || (() => {})).call(d);
-    else (_d.exitFullscreen || _d.webkitExitFullscreen || (() => {})).call(_d);
-  }
-  ['fullscreenBtn', 'startFullscreenBtn'].forEach((i) => $(i).addEventListener('click', toggleFullscreen));
 
   const world = new CANNON.World();
   world.gravity.set(0, -25, 0);
@@ -345,9 +260,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
   world.solver.iterations = 15;
   const pm = new CANNON.Material('std');
   const bounceMat = new CANNON.Material('bounce');
-  const pcm = new CANNON.ContactMaterial(pm, pm, { friction: 0.05, restitution: 0.05, contactEquationStiffness: 1e8, contactEquationRelaxation: 3 });
-  const bounceCm = new CANNON.ContactMaterial(pm, bounceMat, { friction: 0.1, restitution: 1.35, contactEquationStiffness: 1e8, contactEquationRelaxation: 3 });
-  world.addContactMaterial(pcm); world.addContactMaterial(bounceCm); world.defaultContactMaterial = pcm;
+  world.addContactMaterial(new CANNON.ContactMaterial(pm, pm, { friction: 0.05, restitution: 0.05 }));
   const syncBodyAABB = (b) => { b.aabbNeedsUpdate = true; b.computeAABB(); };
 
   const scene = new THREE.Scene();
@@ -357,25 +270,16 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
   const playerObj = new THREE.Object3D(), yawObj = new THREE.Object3D(), pitchObj = new THREE.Object3D();
   scene.add(playerObj); playerObj.add(yawObj); yawObj.add(pitchObj); pitchObj.add(camera);
   pitchObj.position.y = 1.25;
+
   const renderer = new THREE.WebGLRenderer({ antialias: !isTouch, powerPreference: 'high-performance' });
   renderer.setSize(innerWidth, innerHeight);
   renderer.setPixelRatio(Math.min(devicePixelRatio, isTouch ? 1.5 : 2));
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   _d.body.insertBefore(renderer.domElement, _d.body.firstChild);
   scene.add(new THREE.AmbientLight(0x505575, 0.75));
   const moonLight = new THREE.DirectionalLight(0x66bbff, 0.9);
-  moonLight.position.set(50, 100, -50);
-  moonLight.castShadow = true;
-  Object.assign(moonLight.shadow.camera, { left: -120, right: 120, top: 120, bottom: -120 });
-  moonLight.shadow.mapSize.set(isTouch ? 1024 : 2048, isTouch ? 1024 : 2048);
-  if (isTouch) { renderer.shadowMap.enabled = false; moonLight.castShadow = false; }
+  moonLight.position.set(50, 100, -50); moonLight.castShadow = true;
   scene.add(moonLight); scene.add(moonLight.target);
-  [[0, 14, 0, 0x00ffff], [60, 24, 10, 0xff00ff], [90, 50, 0, 0x00ffaa], [-90, 12, -60, 0x8b5cf6], [160, 22, 0, 0xf97316]].forEach(([x, y, z, c]) => {
-    const l = new THREE.PointLight(c, 1.2, 60); l.position.set(x, y, z); scene.add(l);
-  });
-  const flashLight = new THREE.PointLight(0xffff00, 0, 10);
-  flashLight.position.set(0, 0, -1); pitchObj.add(flashLight);
 
   const SKIN_PRESETS = {
     default: { label: 'Klasik Maceracı', visor: 0x111827, pants: 0x1e293b, helmet: false },
@@ -397,44 +301,15 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
 
     const pelvis = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.26, 0.38), pantsMat); pelvis.position.y = 0.95; root.add(pelvis);
     const torso = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.82, 0.42), clothMat); torso.position.y = 1.48; root.add(torso);
-    const vest = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.48, 0.46), darkMat); vest.position.set(0, 1.54, 0); root.add(vest);
-    const coreGlow = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.12, 0.48), visorMat); coreGlow.position.set(0, 1.58, 0); root.add(coreGlow);
-    const pack = new THREE.Mesh(new THREE.BoxGeometry(preset.backpackBig ? 0.58 : 0.46, preset.backpackBig ? 0.65 : 0.48, 0.24), darkMat); pack.position.set(0, 1.52, 0.32); root.add(pack);
-    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, 0.18, 12), skinToneMat); neck.position.y = 1.96; root.add(neck);
-
     const headGroup = new THREE.Group(); headGroup.position.y = 2.24;
-    const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.29, 18, 16), preset.helmet ? clothMat : skinToneMat); headMesh.scale.set(1, 1.08, 1); headGroup.add(headMesh);
-    const visor = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.13, 0.16), visorMat); visor.position.set(0, 0.03, -0.22); headGroup.add(visor);
-    const hair = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.16, 0.52), preset.helmet ? visorMat : darkMat); hair.position.set(0, 0.24, 0); headGroup.add(hair);
+    headGroup.add(new THREE.Mesh(new THREE.SphereGeometry(0.29, 18, 16), preset.helmet ? clothMat : skinToneMat));
     root.add(headGroup);
-
-    const makeArm = (isRight) => {
-      const pivot = new THREE.Group(); pivot.position.set(isRight ? 0.52 : -0.52, 1.82, 0);
-      pivot.add(new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 10), clothMat));
-      const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.1, 0.42, 10), clothMat); upper.position.y = -0.22; pivot.add(upper);
-      const lower = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.085, 0.38, 10), skinToneMat); lower.position.y = -0.58; pivot.add(lower);
-      const hand = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 10), skinToneMat); hand.position.y = -0.8; pivot.add(hand);
-      root.add(pivot); return pivot;
-    };
-    const armL = makeArm(false), armR = makeArm(true);
-
-    const makeLeg = (isRight) => {
-      const pivot = new THREE.Group(); pivot.position.set(isRight ? 0.21 : -0.21, 0.88, 0);
-      const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.12, 0.46, 10), pantsMat); thigh.position.y = -0.23; pivot.add(thigh);
-      const calf = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.095, 0.44, 10), pantsMat); calf.position.y = -0.64; pivot.add(calf);
-      const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.14, 0.36), darkMat); shoe.position.set(0, -0.84, -0.06); pivot.add(shoe);
-      root.add(pivot); return pivot;
-    };
-    const legL = makeLeg(false), legR = makeLeg(true);
-    return { root, clothMat, visorMat, headGroup, armL, armR, legL, legR, walkPhase: 0 };
+    return { root, legL: new THREE.Group(), legR: new THREE.Group(), armL: new THREE.Group(), armR: new THREE.Group(), walkPhase: 0 };
   }
 
-  function animateHumanoidRig(rig, speed, dt, isAiming = true) {
+  function animateHumanoidRig(rig, speed, dt) {
     if (speed > 0.3) rig.walkPhase += dt * Math.min(speed * 0.9, 12);
     else rig.walkPhase = 0;
-    const swing = speed > 0.3 ? Math.sin(rig.walkPhase) * 0.65 : 0;
-    rig.legL.rotation.x = swing; rig.legR.rotation.x = -swing;
-    rig.armL.rotation.x = -swing * 0.8; rig.armR.rotation.x = isAiming ? 1.35 : swing * 0.8;
   }
 
   let localRig = buildRealisticHumanoid(myColor, mySkin);
@@ -450,17 +325,19 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
 
   function toggleCameraView() {
     if (drivingCar || marbleMode) return;
-    thirdPerson = !thirdPerson; applyCameraRig();
+    thirdPerson = !thirdPerson;
+    if (thirdPerson) { camera.position.set(0, 1.1, 4.8); pitchObj.position.set(0, 1.35, 0); }
+    else { camera.position.set(0, 0, 0); pitchObj.position.set(0, 1.25, 0); }
   }
-  $('camViewBtn').addEventListener('click', (e) => { e.currentTarget.blur(); toggleCameraView(); });
+  $('camViewBtn').addEventListener('click', () => toggleCameraView());
 
   const mapStatues = [];
   (function() {
     const spots = [
-      { skin: 'knight',  x: 0,    y: 10,  z: 0,    title: '🤖 Siber Şövalye (Neon Kule)' },
-      { skin: 'astro',   x: 0,    y: 40,  z: -228, title: '👩‍🚀 Astronot (Uçan Adalar Zirvesi)' },
-      { skin: 'ninja',   x: 20,   y: 31,  z: 110,  title: '🥷 Neon Ninja (Gökdelen Çatısı)' },
-      { skin: 'soldier', x: -130, y: 3.5, z: 100,  title: '🪖 Taktik Asker (Yarış Pisti)' }
+      { skin: 'knight',  x: 0,    y: 10,  z: 0,    title: '🤖 Siber Şövalye' },
+      { skin: 'astro',   x: 0,    y: 40,  z: -228, title: '👩‍🚀 Astronot' },
+      { skin: 'ninja',   x: 20,   y: 31,  z: 110,  title: '🥷 Neon Ninja' },
+      { skin: 'soldier', x: -130, y: 3.5, z: 100,  title: '🪖 Taktik Asker' }
     ];
     spots.forEach((s) => {
       const pad = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.7, 0.3, 20), new THREE.MeshBasicMaterial({ color: 0x00ffff }));
@@ -480,24 +357,43 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     return best;
   }
 
-  // SİLAHLAR: GRAVITY GUN & PORTAL GUN & FINGER PEW
+  // --- HARİTADA BULUNABİLİR SİLAHLAR (GRAVITY GUN & PORTAL GUN & PEW) ---
+  const worldWeapons = [];
+  const WEAPON_TYPES = [
+    { id: 'gravity', name: '🌀 Gravity Gun', color: 0xf97316, x: 5, y: 3, z: 5 },
+    { id: 'portal',  name: '🌀 Portal Gun',  color: 0x38bdf8, x: -5, y: 3, z: 5 },
+    { id: 'pew',     name: '👉 Pew Gun',     color: 0x00ffff, x: 0, y: 3, z: -10 }
+  ];
+
+  WEAPON_TYPES.forEach(wt => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.4, 1.2), new THREE.MeshStandardMaterial({ color: wt.color, emissive: wt.color, emissiveIntensity: 0.6 }));
+    mesh.position.set(wt.x, wt.y, wt.z);
+    scene.add(mesh);
+    worldWeapons.push({ ...wt, mesh, collected: false });
+  });
+
   const WEAPON_MODES = [
-    { id: 'gravity', name: '🌀 Gravity Gun (Objeyi Tut/Fırlat)', btn: '🔫 Silah: Gravity', color: 0xf97316 },
-    { id: 'portal',  name: '🌀 Portal Gun (Işınlanma Kapısı)',   btn: '🌀 Silah: Portal',  color: 0x38bdf8 },
-    { id: 'pew',     name: '👉 Klasik Pew (-25 HP)',            btn: '👉 Silah: Pew',     color: 0x00ffff }
+    { id: 'gravity', name: '🌀 Gravity Gun (Tut/Fırlat)', btn: '🌀 Silah: Gravity', color: 0xf97316 },
+    { id: 'portal',  name: '🌀 Portal Gun (Işınlan)',       btn: '🌀 Silah: Portal',  color: 0x38bdf8 },
+    { id: 'pew',     name: '👉 Klasik Pew (-25 HP)',        btn: '👉 Silah: Pew',     color: 0x00ffff }
   ];
   let weaponModeIdx = 0;
-  let grabbedProp = null; // Gravity Gun için tutulan obje
+  let grabbedProp = null;
+  const unlocKilledWeapons = { gravity: true, portal: false, pew: false }; // Başlangıçta sadece Gravity açık
 
   const weaponGroup = new THREE.Group();
-  const gunBody = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.25, 0.7), new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8 }));
+  const gunBody = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.25, 0.7), new THREE.MeshStandardMaterial({ color: 0xf97316, metalness: 0.8 }));
   gunBody.position.set(0.35, -0.25, -0.5);
-  camera.add(weaponGroup);
-  weaponGroup.add(gunBody);
+  camera.add(weaponGroup); weaponGroup.add(gunBody);
 
   function cycleWeaponMode() {
-    weaponModeIdx = (weaponModeIdx + 1) % WEAPON_MODES.length;
-    const m = WEAPON_MODES[weaponModeIdx];
+    const unlocked = WEAPON_MODES.filter(w => unlocKilledWeapons[w.id]);
+    const currentId = WEAPON_MODES[weaponModeIdx].id;
+    let idx = unlocked.findIndex(w => w.id === currentId);
+    idx = (idx + 1) % unlocked.length;
+    const m = unlocked[idx];
+    weaponModeIdx = WEAPON_MODES.findIndex(w => w.id === m.id);
+
     gunBody.material.color.setHex(m.color);
     $('fingerModeBtn').textContent = m.btn;
     $('hudWeaponName').textContent = m.name;
@@ -506,7 +402,6 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
   $('fingerModeBtn').addEventListener('click', (e) => { e.currentTarget.blur(); cycleWeaponMode(); });
 
   const raycaster = new THREE.Raycaster();
-  const portals = { blue: null, orange: null }; // Portal Gun için
 
   function triggerWeaponAction() {
     if (!isPlaying || isShatteredLocal) return;
@@ -515,20 +410,16 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
 
     if (mode.id === 'gravity') {
       if (grabbedProp) {
-        // Objeyi Fırlat
         const aim = new THREE.Vector3(); camera.getWorldDirection(aim);
         if (grabbedProp.body && !grabbedProp.isStatic) {
-          grabbedProp.body.velocity.set(aim.x * 35, aim.y * 35 + 5, aim.z * 35);
+          grabbedProp.body.velocity.set(aim.x * 40, aim.y * 40 + 6, aim.z * 40);
         }
         grabbedProp = null;
       } else {
-        // Obje Tut
         const hit = raycaster.intersectObjects(intersectableObjects, true).find((x) => !x.object.userData.isPlayer);
         if (hit) {
           let obj = hit.object; while (obj.parent && !obj.userData.isProp) obj = obj.parent;
-          if (obj.userData && obj.userData.isProp) {
-            grabbedProp = activeProps[obj.userData.id];
-          }
+          if (obj.userData && obj.userData.isProp) grabbedProp = activeProps[obj.userData.id];
         }
       }
     } else if (mode.id === 'portal') {
@@ -536,7 +427,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
       if (hit) {
         playerBody.position.set(hit.point.x, hit.point.y + 2, hit.point.z);
         playerBody.velocity.set(0, 0, 0);
-        appendChatMessage('PORTAL', '#38bdf8', 'Kapıdan geçildi!');
+        appendChatMessage('PORTAL', '#38bdf8', 'Işınlanıldı!');
       }
     } else if (mode.id === 'pew') {
       const aim = new THREE.Vector3(); camera.getWorldDirection(aim);
@@ -547,105 +438,47 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     }
   }
 
-  $('settingsBtn').addEventListener('click', () => {
-    settingsModal.style.display = settingsModal.style.display === 'block' ? 'none' : 'block';
-    if (settingsModal.style.display === 'block' && _d.pointerLockElement) _d.exitPointerLock();
-  });
-  $('closeSettingsBtn').addEventListener('click', () => (settingsModal.style.display = 'none'));
-  $('playerColorPicker').addEventListener('input', (e) => {
-    myColor = e.target.value; rebuildLocalAvatar(); setLocalMarbleColor(); syncPlayerState(true);
-  });
-  $('skinSelect').addEventListener('change', (e) => { mySkin = e.target.value; rebuildLocalAvatar(); syncPlayerState(true); });
-  $('sensSlider').addEventListener('input', (e) => { lookSensitivity = +e.target.value; $('sensVal').innerText = lookSensitivity.toFixed(1) + 'x'; });
-  $('fovSlider').addEventListener('input', (e) => { camera.fov = +e.target.value; camera.updateProjectionMatrix(); $('fovVal').innerText = e.target.value + '°'; });
-  $('ragdollToggle').addEventListener('change', (e) => (ragdollEnabled = e.target.checked));
-  $('ghostToggle').addEventListener('change', (e) => { showGhost = e.target.checked; if (!showGhost) ghostMesh.visible = false; });
-  $('shadowsToggle').addEventListener('change', (e) => {
-    renderer.shadowMap.enabled = e.target.checked; moonLight.castShadow = e.target.checked;
-    scene.traverse((o) => { if (o.material) o.material.needsUpdate = true; });
-  });
-  $('respawnBtn').addEventListener('click', () => {
-    if (drivingCar) exitCar();
-    if (isShatteredLocal) endLocalRagdoll(true);
-    playerBody.position.set(0, 15, 8); playerBody.velocity.set(0, 0, 0);
-    updateHpUI(100); settingsModal.style.display = 'none';
-  });
-
-  function syncAdminButtonVisibility() {
-    if (_0xV.getAdm()) { $('adminBtn').classList.remove('hidden'); }
-    else { $('adminBtn').classList.add('hidden'); adminModal.style.display = 'none'; }
+  // --- HARİTA YAPISI (ESKİ ZENGİN VERSİYON) ---
+  const intersectableObjects = [];
+  function createCheckerboard() {
+    const c = _d.createElement('canvas'); c.width = c.height = 512;
+    const x = c.getContext('2d');
+    x.fillStyle = '#0a0a1a'; x.fillRect(0, 0, 512, 512); x.fillStyle = '#1a1a3a';
+    for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) if ((i + j) % 2 === 0) x.fillRect(i * 64, j * 64, 64, 64);
+    return new THREE.CanvasTexture(c);
+  }
+  function addStaticBlock(x, y, z, w, h, d, color, neon = false, rot = [0, 0, 0]) {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color, roughness: neon ? 0.2 : 0.7, emissive: neon ? color : 0 }));
+    mesh.position.set(x, y + h / 2, z); mesh.rotation.set(rot[0], rot[1], rot[2], 'XYZ');
+    mesh.castShadow = mesh.receiveShadow = true; scene.add(mesh); intersectableObjects.push(mesh);
+    const body = new CANNON.Body({ mass: 0, type: CANNON.Body.STATIC, material: pm });
+    body.addShape(new CANNON.Box(new CANNON.Vec3(w / 2, h / 2, d / 2)));
+    body.position.copy(mesh.position); body.quaternion.set(mesh.quaternion.x, mesh.quaternion.y, mesh.quaternion.z, mesh.quaternion.w);
+    syncBodyAABB(body); world.addBody(body);
   }
 
-  function renderAdminModal() {
-    if (!_0xV.getAdm()) { adminModal.style.display = 'none'; return; }
-    const list = $('adminPlayerList'); list.innerHTML = '';
-    const allIds = [_uid, ...Object.keys(remotePlayers)];
-    allIds.forEach((id) => {
-      const isMe = id === _uid;
-      const hp = isMe ? _0xV.getHp() : (remotePlayers[id]?.hp ?? 100);
-      const row = _d.createElement('div');
-      row.className = 'flex items-center justify-between bg-gray-900/80 px-2 py-1 rounded';
-      row.innerHTML = `<span class="font-mono">${id}${isMe ? ' (Sen)' : ''} · ❤️${hp}</span>`;
-      const btns = _d.createElement('div'); btns.className = 'flex gap-1';
-      [['💚', 'heal'], ['💀', 'kill'], ['📍TP', 'tpTo'], ['🧲Çek', 'bring'], ['👑', 'makeAdmin'], ['🚪At', 'kick']].forEach(([lbl, act]) => {
-        if (isMe && (act === 'tpTo' || act === 'bring' || act === 'kick')) return;
-        const b = _d.createElement('button');
-        b.type = 'button'; b.className = 'px-1.5 py-0.5 bg-gray-700 hover:bg-gray-600 rounded text-[10px] cursor-pointer';
-        b.textContent = lbl; b.onclick = () => { if (_0xV.getAdm()) sendPacket({ type: 'adminAction', action: act, targetId: id }); };
-        btns.appendChild(b);
-      });
-      row.appendChild(btns); list.appendChild(row);
-    });
-  }
+  (function() {
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), new THREE.MeshStandardMaterial({ map: createCheckerboard(), roughness: 0.8 }));
+    floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor); intersectableObjects.push(floor);
+    const fb = new CANNON.Body({ mass: 0, type: CANNON.Body.STATIC, material: pm });
+    fb.addShape(new CANNON.Box(new CANNON.Vec3(300, 1, 300))); fb.position.set(0, -1, 0); syncBodyAABB(fb); world.addBody(fb);
 
-  function toggleAdminModal() {
-    if (!_0xV.getAdm()) { appendChatMessage('SİSTEM', '#ef4444', '⛔ Admin Paneli sadece yetkililerde çalışır!'); return; }
-    const open = adminModal.style.display !== 'block';
-    adminModal.style.display = open ? 'block' : 'none';
-    if (open) { renderAdminModal(); if (_d.pointerLockElement) _d.exitPointerLock(); }
-  }
-
-  $('adminBtn').addEventListener('click', toggleAdminModal);
-  $('closeAdminBtn').addEventListener('click', () => (adminModal.style.display = 'none'));
-
-  $('startAdminAuthBtn').addEventListener('click', () => {
-    const pw = $('startAdminPassInput').value.trim();
-    if (!pw) return; _admPw = pw;
-    if (isConnected) sendPacket({ type: 'chat', text: '/admin ' + pw });
-    else setStatus('Yetkili şifresi kaydedildi.', 'text-yellow-300');
-  });
-
-  $('admGodBtn').addEventListener('click', () => {
-    if (!_0xV.getAdm()) return;
-    _0xV.setGod(!_0xV.getGod());
-    $('admGodBtn').textContent = `🛡️ Ölümsüzlük: ${_0xV.getGod() ? 'AÇIK' : 'KAPALI'}`;
-    updateHpUI(_0xV.getHp()); if (isConnected) sendPacket({ type: 'chat', text: '/god' });
-  });
-  $('admFlyBtn').addEventListener('click', () => {
-    if (!_0xV.getAdm()) return;
-    _0xV.setFly(!_0xV.getFly());
-    $('admFlyBtn').textContent = `🕊️ Uçma (Fly): ${_0xV.getFly() ? 'AÇIK' : 'KAPALI'}`;
-  });
-  $('admSpeedBtn').addEventListener('click', () => {
-    if (!_0xV.getAdm()) return;
-    const cur = _0xV.getSpd(); _0xV.setSpd(cur === 1 ? 2.2 : (cur === 2.2 ? 3.5 : 1));
-    $('admSpeedBtn').textContent = `⚡ Süper Hız: ${_0xV.getSpd()}x`;
-  });
-  $('admHealSelfBtn').addEventListener('click', () => { if (_0xV.getAdm()) { updateHpUI(100); sendPacket({ type: 'healSelf', amount: 100 }); } });
-  $('admHealAllBtn').addEventListener('click', () => { if (_0xV.getAdm()) sendPacket({ type: 'adminAction', action: 'heal', targetId: 'all' }); });
-  $('admKillAllBtn').addEventListener('click', () => { if (_0xV.getAdm()) sendPacket({ type: 'adminAction', action: 'kill', targetId: 'all' }); });
-  $('admAnnounceBtn').addEventListener('click', () => {
-    if (!_0xV.getAdm()) return; const t = $('admAnnounceInput').value.trim();
-    if (t) { sendPacket({ type: 'adminAction', action: 'announce', text: t }); $('admAnnounceInput').value = ''; }
-  });
+    const B = [
+      [0, 0, 0, 20, 2, 20, 0x333333, false], [0, 2, 0, 10, 8, 10, 0x00ffff, true],
+      [0, 0, -75, 60, 3, 24, 0x0f766e, false], [0, 3, -84, 20, 1, 6, 0x14b8a6, true],
+      [0, 38, -228, 16, 2, 16, 0xfacc15, true], [-30, 0, 110, 12, 30, 12, 0x1e293b, false],
+      [20, 0, 110, 16, 30, 16, 0x1e293b, false], [20, 30, 110, 16, 1, 16, 0x22d3ee, true],
+      [-130, 0, 100, 90, 3, 40, 0x1f2937, false], [-130, 3, 100, 10, 0.5, 10, 0xfacc15, true]
+    ];
+    [-18, 0, 18].forEach((x) => B.push([x, 1.5, -40, 10, 1, 16, 0xffcc00, true, [0.3, 0, 0]]));
+    B.forEach((b) => addStaticBlock(b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8]));
+  })();
 
   const playerRadius = 0.8;
   const playerBody = new CANNON.Body({ mass: 5, material: pm, allowSleep: false });
   playerBody.addShape(new CANNON.Sphere(playerRadius));
-  playerBody.position.set(0, 15, 8);
-  playerBody.fixedRotation = true; playerBody.updateMassProperties();
+  playerBody.position.set(0, 15, 8); playerBody.fixedRotation = true; playerBody.updateMassProperties();
   world.addBody(playerBody);
-  let jumpCooldown = 0;
 
   playerBody.addEventListener('collide', (e) => {
     const other = e.body; if (!other) return;
@@ -657,15 +490,6 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     }
   });
 
-  function isBodyGrounded(b) {
-    for (const c of world.contacts) {
-      if (c.bi.id === b.id || c.bj.id === b.id) {
-        const up = c.bi.id === b.id ? -c.ni.y : c.ni.y;
-        if (up > 0.45) return true;
-      }
-    }
-    return false;
-  }
   function tryJump() {
     if (drivingCar || isShatteredLocal || jumpCooldown > 0) return;
     if (_0xV.getFly() || isBodyGrounded(playerBody)) {
@@ -674,7 +498,16 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     }
   }
 
-  // OYUN İÇİ EŞYA MENÜSÜ & ZENGİN NESNELER (27 Eşya)
+  function isBodyGrounded(b) {
+    for (const c of world.contacts) {
+      if (c.bi.id === b.id || c.bj.id === b.id) {
+        if ((c.bi.id === b.id ? -c.ni.y : c.ni.y) > 0.45) return true;
+      }
+    }
+    return false;
+  }
+
+  // EŞYA MENÜSÜ & 27 EŞYA
   const PROP_TYPES = {
     ramp:       { s: 'box',  h: [4, 0.5, 7],       m: 0, tilt: 0.28, lift: 1.45, i: '📐', l: 'Rampa' },
     steepRamp:  { s: 'box',  h: [4, 0.5, 7],       m: 0, tilt: 0.48, lift: 2.65, i: '🚀', l: 'Dik Rampa' },
@@ -682,7 +515,6 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     bridge:     { s: 'box',  h: [2.5, 0.3, 8],     m: 0, lift: 0.3,              i: '🌉', l: 'Köprü' },
     wall:       { s: 'box',  h: [6, 3, 0.5],       m: 0, lift: 3.0,              i: '🧱', l: 'Duvar' },
     platform:   { s: 'box',  h: [5, 0.5, 5],       m: 0, lift: 0.5,              i: '⬛', l: 'Platform' },
-    pillar:     { s: 'box',  h: [1.5, 4, 1.5],     m: 0, lift: 4.0,              i: '🏛️', l: 'Sütun' },
     trampoline: { s: 'box',  h: [2.5, 0.3, 2.5],   m: 0, lift: 0.3, bounce: true, i: '🟣', l: 'Trambolin' },
     medkit:     { s: 'box',  h: [0.8, 0.5, 0.8],   m: 1.5, medkit: true, fixedColor: '#ef4444', i: '➕', l: 'İlk Yardım (+50HP)' },
     box:        { s: 'box',  h: [1, 1, 1],         m: 2,   i: '📦', l: 'Kutu' },
@@ -712,7 +544,6 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
       const t = PROP_TYPES[type];
       if (t.s === 'ball') geoCache[type] = new THREE.SphereGeometry(t.r, 20, 16);
       else if (t.cyl) geoCache[type] = new THREE.CylinderGeometry(t.h[0], t.h[0], t.h[1] * 2, 18);
-      else if (t.cone) geoCache[type] = new THREE.ConeGeometry(t.h[0], t.h[1] * 2, 16);
       else geoCache[type] = new THREE.BoxGeometry(t.h[0] * 2, t.h[1] * 2, t.h[2] * 2);
     }
     return geoCache[type];
@@ -730,7 +561,6 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     $('hudSelectedObj').textContent = `${PROP_TYPES[type].i} ${PROP_TYPES[type].l}`;
     _d.querySelectorAll('.obj-card').forEach((el) => el.classList.toggle('active', el.dataset.type === type));
   }
-  function rotateSelectedObject() { buildYawStep = (buildYawStep + 1) % 8; }
 
   function computePlacementTransform(type) {
     const t = PROP_TYPES[type];
@@ -739,8 +569,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     const dir = new THREE.Vector3(); camera.getWorldDirection(dir);
     const base = hit ? hit.point.clone() : new THREE.Vector3(playerBody.position.x, playerBody.position.y, playerBody.position.z).addScaledVector(dir, 12);
     const lift = t.lift !== undefined ? t.lift : (t.h ? t.h[1] : t.r) + 0.2;
-    const totalYaw = yawObj.rotation.y + buildYawStep * (Math.PI / 4);
-    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(t.tilt || 0, totalYaw, 0, 'YXZ'));
+    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(t.tilt || 0, yawObj.rotation.y + buildYawStep * (Math.PI / 4), 0, 'YXZ'));
     return { x: base.x, y: base.y + lift, z: base.z, q };
   }
 
@@ -756,10 +585,7 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     mesh.userData = { isProp: true, id }; scene.add(mesh); intersectableObjects.push(mesh);
 
     const shape = t.s === 'ball' ? new CANNON.Sphere(t.r) : new CANNON.Box(new CANNON.Vec3(t.h[0], t.h[1], t.h[2]));
-    const body = new CANNON.Body({
-      mass: isStatic ? 0 : t.m, type: isStatic ? CANNON.Body.STATIC : CANNON.Body.DYNAMIC,
-      material: t.bounce ? bounceMat : pm, linearDamping: 0.1, angularDamping: 0.2
-    });
+    const body = new CANNON.Body({ mass: isStatic ? 0 : t.m, type: isStatic ? CANNON.Body.STATIC : CANNON.Body.DYNAMIC, material: pm });
     body.isTrampoline = !!t.bounce; body.isMedkit = !!t.medkit; body.propId = id;
     body.addShape(shape); body.position.copy(mesh.position);
     body.quaternion.set(mesh.quaternion.x, mesh.quaternion.y, mesh.quaternion.z, mesh.quaternion.w);
@@ -780,483 +606,155 @@ canvas{display:block;width:100vw;height:100vh;position:absolute;top:0;left:0;z-i
     const t = PROP_TYPES[type]; if (!t || !isPlaying) return null;
     const tr = customPos || computePlacementTransform(type);
     const id = 'p_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
-    const data = {
-      type: 'spawnProp', id, propType: type, color: t.fixedColor || randHex(),
-      x: tr.x, y: tr.y, z: tr.z, qx: tr.q ? tr.q.x : 0, qy: tr.q ? tr.q.y : 0, qz: tr.q ? tr.q.z : 0, qw: tr.q ? tr.q.w : 1
-    };
-    const created = spawnPropVisual(id, data);
-    if (isConnected) sendPacket(data); return created;
+    const data = { type: 'spawnProp', id, propType: type, color: t.fixedColor || randHex(), x: tr.x, y: tr.y, z: tr.z, qx: tr.q.x, qy: tr.q.y, qz: tr.q.z, qw: tr.q.w };
+    spawnPropVisual(id, data);
+    if (isConnected) sendPacket(data);
   }
 
-  function spawnRandomItem(customPos) {
-    if (!isPlaying) return null;
-    const randKey = DYNAMIC_PROP_KEYS[Math.floor(Math.random() * DYNAMIC_PROP_KEYS.length)];
-    selectObjectType(randKey); return spawnObject(randKey, customPos);
-  }
-
-  function spawnRandomRain() {
-    if (!isPlaying) return;
-    const tr = computePlacementTransform(selectedObj);
-    for (let i = 0; i < 5; i++) {
-      setTimeout(() => {
-        spawnRandomItem({ x: tr.x + (Math.random() - 0.5) * 8, y: tr.y + 8 + i * 2.2, z: tr.z + (Math.random() - 0.5) * 8, q: new THREE.Quaternion() });
-      }, i * 90);
-    }
-  }
-
-  $('randomPropBtn').addEventListener('click', (e) => { e.currentTarget.blur(); spawnRandomItem(); });
-  $('menuRandomSingleBtn').addEventListener('click', () => spawnRandomItem());
-  $('menuRandomRainBtn').addEventListener('click', () => spawnRandomRain());
-  $('randBtnMobile').addEventListener('touchstart', (e) => { e.preventDefault(); spawnRandomItem(); }, { passive: false });
-
-  function deleteAimed() {
-    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-    const hit = raycaster.intersectObjects(intersectableObjects, true).find((x) => !(x.object.userData.isPlayer && !x.object.visible) && x.object !== ghostMesh);
-    if (!hit) return;
-    let obj = hit.object; while (obj.parent && !obj.userData.isProp) obj = obj.parent;
-    if (!obj.userData || !obj.userData.isProp) return;
-    const id = obj.userData.id; removeProp(id);
-    if (isConnected) sendPacket({ type: 'removeProp', id });
-  }
-
-  function toggleBuildMenu() {
-    const open = buildMenu.style.display !== 'block';
-    buildMenu.style.display = open ? 'block' : 'none';
-    if (open && _d.pointerLockElement) _d.exitPointerLock();
-    else if (!open && innerWidth > 768 && isPlaying) _d.body.requestPointerLock();
-  }
+  $('randomPropBtn').addEventListener('click', () => spawnObject(DYNAMIC_PROP_KEYS[Math.floor(Math.random() * DYNAMIC_PROP_KEYS.length)]));
 
   (function() {
     const gStatic = $('buildGridStatic'), gDyn = $('buildGridDynamic');
-    PROP_ORDER.forEach((k, i) => {
+    PROP_ORDER.forEach((k) => {
       const t = PROP_TYPES[k], card = _d.createElement('div');
-      card.className = 'obj-card' + (k === selectedObj ? ' active' : ''); card.dataset.type = k;
-      const keyHint = i < 10 ? `[${(i + 1) % 10}]` : '';
-      card.innerHTML = `<span>${t.i} ${t.l}</span><span class="text-xs text-emerald-300 font-mono">${keyHint}</span>`;
+      card.className = 'obj-card'; card.innerHTML = `<span>${t.i} ${t.l}</span>`;
       card.onclick = () => { selectObjectType(k); spawnObject(k); };
       if (t.m === 0) gStatic.appendChild(card); else gDyn.appendChild(card);
     });
-    $('buildBtn').addEventListener('click', (e) => { e.currentTarget.blur(); toggleBuildMenu(); });
-    $('closeBuildBtn').addEventListener('click', toggleBuildMenu);
-    $('spawnSelectedBtn').addEventListener('click', () => spawnObject(selectedObj));
-    $('deleteAimedBtn').addEventListener('click', deleteAimed);
-    $('clearPropsBtn').addEventListener('click', (e) => {
-      e.currentTarget.blur();
-      if (!_0xV.getAdm() && isConnected) {
-        appendChatMessage('SİSTEM', '#ef4444', '⛔ Tüm objeleri sadece Admin temizleyebilir!');
-        return;
-      }
-      Object.keys(activeProps).forEach(removeProp);
-      if (isConnected) sendPacket({ type: 'clearProps' });
-    });
-    $('spawnBtnMobile').addEventListener('touchstart', (e) => { e.preventDefault(); spawnObject(selectedObj); }, { passive: false });
+    $('buildBtn').addEventListener('click', () => { buildMenu.style.display = buildMenu.style.display === 'block' ? 'none' : 'block'; });
+    $('closeBuildBtn').addEventListener('click', () => buildMenu.style.display = 'none');
+    $('clearPropsBtn').addEventListener('click', () => { Object.keys(activeProps).forEach(removeProp); if (isConnected) sendPacket({ type: 'clearProps' }); });
   })();
 
-  let socket = null, udpSocket = null, udpHost = '127.0.0.1', udpPort = 3000;
-  let isConnected = false, lastSyncTime = 0;
+  let socket = null, isConnected = false;
   const remotePlayers = {};
 
-  function formatWsUrl(raw) {
-    let a = raw.trim() || '127.0.0.1:3000';
-    if (!/^wss?:\/\//.test(a)) {
-      const host = a.split(':')[0];
-      const plain = /^(127\.|localhost|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)|\.(joinmc\.link|ply\.gg|playit\.gg)$/.test(host);
-      const secure = !plain && (location.protocol === 'https:' || /\.(onrender\.com|glitch\.me|bonto\.dev)$/.test(host));
-      a = (secure ? 'wss://' : 'ws://') + a;
-    }
-    return a;
-  }
-  function loadServers() { try { return JSON.parse(localStorage.getItem('servers') || '[]'); } catch (e) { return []; } }
-  function saveServers(l) { try { localStorage.setItem('servers', JSON.stringify(l.slice(0, 12))); } catch (e) {} }
-  function renderServers() {
-    const box = $('savedServers'); box.innerHTML = '';
-    loadServers().forEach((s) => {
-      const b = _d.createElement('button'); b.type = 'button';
-      b.className = 'px-2 py-1 bg-gray-800 border border-cyan-500/40 rounded text-xs font-mono cursor-pointer';
-      b.textContent = s + ' '; b.onclick = () => { serverIpInput.value = s; };
-      const x = _d.createElement('span'); x.textContent = '✕'; x.className = 'text-red-400 ml-1';
-      x.onclick = (e) => { e.stopPropagation(); saveServers(loadServers().filter((v) => v !== s)); renderServers(); };
-      b.appendChild(x); box.appendChild(b);
-    });
-  }
-  $('saveServerBtn').addEventListener('click', () => {
-    const v = serverIpInput.value.trim().slice(0, 80); if (!v) return;
-    const l = loadServers(); if (!l.includes(v)) l.unshift(v); saveServers(l); renderServers();
-  });
-  $('localServerBtn').addEventListener('click', () => { serverIpInput.value = '127.0.0.1:3000'; });
-  try { const ls = localStorage.getItem('lastServer'); if (ls) serverIpInput.value = ls; } catch (e) {}
-  renderServers();
-  function setStatus(t, cls) { authStatus.innerText = t; authStatus.className = cls + ' mb-4 font-mono text-xs text-center'; }
-
-  function sendJoinPayload() {
-    const startPw = $('startAdminPassInput') ? $('startAdminPassInput').value.trim() : '';
-    if (startPw) _admPw = startPw;
-    sendPacket({
-      type: 'join', id: _uid, adminPass: _admPw,
-      color: myColor, skin: mySkin, x: playerBody.position.x, y: playerBody.position.y, z: playerBody.position.z, yaw: yawObj.rotation.y
-    });
-  }
-
   function connectToServer() {
-    const proto = $('protocolSelect') ? $('protocolSelect').value : 'tcp';
-    const raw = serverIpInput.value.trim() || '127.0.0.1:3000';
-    try { localStorage.setItem('lastServer', raw); } catch (e) {}
-
-    if (socket) { socket.onclose = null; socket.close(); socket = null; }
-    if (udpSocket) { try { udpSocket.close(); } catch (e) {} udpSocket = null; }
-
-    const url = formatWsUrl(raw);
-    setStatus(`Bağlanılıyor: ${url}...`, 'text-cyan-400 animate-pulse');
-    try { socket = new WebSocket(url); } catch (e) { setStatus('Geçersiz Sunucu Adresi.', 'text-red-400'); return; }
+    const url = serverIpInput.value.trim() || '127.0.0.1:3000';
+    try { socket = new WebSocket(url.startsWith('ws') ? url : 'ws://' + url); } catch (e) { return; }
     socket.onopen = () => {
-      isConnected = true; setStatus(`Bağlandı! (${url})`, 'text-green-400');
-      sendJoinPayload();
+      isConnected = true;
+      socket.send(JSON.stringify({ type: 'join', id: _uid, adminPass: _admPw, color: myColor, skin: mySkin, x: 0, y: 15, z: 8, yaw: 0 }));
     };
-    socket.onmessage = (e) => { try { handleServerMessage(JSON.parse(e.data)); } catch (err) {} };
-    socket.onerror = () => {
-      isConnected = false;
-      setStatus(`Çevrimdışı Mod (${url} adresine ulaşılamadı)`, 'text-amber-400');
-    };
-    socket.onclose = () => { isConnected = false; Object.keys(remotePlayers).forEach(removeRemotePlayer); };
-  }
-
-  function sendPacket(o) {
-    const str = JSON.stringify(o);
-    if (socket && socket.readyState === WebSocket.OPEN) socket.send(str);
-  }
-
-  function handleServerMessage(msg) {
-    if (!msg || !msg.type) return;
-    switch (msg.type) {
-      case 'init':
-        _uid = msg.selfId || _uid; _syncAnonUI();
-        _0xV.setAdm(!!msg.isAdmin); syncAdminButtonVisibility();
-        (msg.players || []).forEach((p) => p.id !== _uid && updateOrCreateRemotePlayer(p));
-        (msg.props || []).forEach((p) => spawnPropVisual(p.id, p));
-        (msg.cars || []).forEach((c) => { const car = createCarObject(c.id, c); if (drivingCar !== car) applyRemoteCarState(car, c); });
-        break;
-      case 'playerUpdate': if (msg.id !== _uid) updateOrCreateRemotePlayer(msg); break;
-      case 'playerLeave': removeRemotePlayer(msg.id); break;
-      case 'adminStatus':
-        _0xV.setAdm(!!msg.isAdmin);
-        syncAdminButtonVisibility();
-        if (_0xV.getAdm() && adminModal.style.display === 'block') renderAdminModal();
-        break;
-      case 'godMode': _0xV.setGod(!!msg.enabled); updateHpUI(_0xV.getHp()); break;
-      case 'hpUpdate': updateHpUI(msg.hp); break;
-      case 'teleport':
-        if (drivingCar) exitCar();
-        playerBody.position.set(msg.x, msg.y, msg.z); playerBody.velocity.set(0, 0, 0); break;
-      case 'playerHit':
-        if (msg.targetId === _uid && !_0xV.getGod()) {
-          const nextHp = msg.hp !== undefined ? msg.hp : (_0xV.getHp() - (msg.damage || 25));
-          updateHpUI(nextHp);
-          if (_0xV.getHp() <= 0) { if (drivingCar) exitCar(); triggerLocalShatter({ x: msg.dx || 0, y: msg.dy || 0, z: msg.dz || 0 }); }
-          else { playerBody.velocity.x += (msg.dx || 0) * 10; playerBody.velocity.y += 5; playerBody.velocity.z += (msg.dz || 0) * 10; }
-        }
-        break;
-      case 'spawnProp': spawnPropVisual(msg.id, msg); break;
-      case 'removeProp': removeProp(msg.id); break;
-      case 'clearProps': Object.keys(activeProps).forEach(removeProp); break;
-      case 'impulseProp': {
-        const p = activeProps[msg.id];
-        if (p && p.body && !p.isStatic) {
-          p.body.wakeUp();
-          p.body.applyImpulse(new CANNON.Vec3(msg.fx, msg.fy, msg.fz), new CANNON.Vec3(msg.px - p.body.position.x, msg.py - p.body.position.y, msg.pz - p.body.position.z));
-        }
-        break;
+    socket.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'init') {
+        _uid = msg.selfId; _0xV.setAdm(!!msg.isAdmin); syncAdminButtonVisibility();
+      } else if (msg.type === 'playerUpdate' && msg.id !== _uid) {
+        updateOrCreateRemotePlayer(msg);
+      } else if (msg.type === 'playerLeave') {
+        removeRemotePlayer(msg.id);
+      } else if (msg.type === 'spawnProp') {
+        spawnPropVisual(msg.id, msg);
+      } else if (msg.type === 'removeProp') {
+        removeProp(msg.id);
+      } else if (msg.type === 'clearProps') {
+        Object.keys(activeProps).forEach(removeProp);
       }
-      case 'spawnCar':
-      case 'carUpdate': {
-        const car = createCarObject(msg.id, msg);
-        if (drivingCar === car) { if (msg.driverId && msg.driverId !== _uid) exitCar(); break; }
-        applyRemoteCarState(car, msg); break;
-      }
-      case 'chat': appendChatMessage(msg.uid, msg.color, msg.text); break;
-    }
-  }
-
-  function makeNameplateSprite() {
-    const canvas = _d.createElement('canvas'); canvas.width = 256; canvas.height = 64;
-    const tex = new THREE.CanvasTexture(canvas);
-    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
-    sprite.scale.set(2.4, 0.6, 1); sprite.position.y = 2.85;
-    return { sprite, canvas, ctx: canvas.getContext('2d'), tex };
-  }
-
-  function drawNameplate(np, id, hp, adminFlag) {
-    const ctx = np.ctx; ctx.clearRect(0, 0, 256, 64);
-    ctx.fillStyle = 'rgba(0,0,0,0.65)'; ctx.fillRect(18, 6, 220, 48);
-    ctx.font = 'bold 20px sans-serif'; ctx.fillStyle = adminFlag ? '#facc15' : '#ffffff';
-    ctx.textAlign = 'center'; ctx.fillText((adminFlag ? '👑 ' : '') + id.slice(0, 12), 128, 28);
-    ctx.fillStyle = '#334155'; ctx.fillRect(34, 36, 188, 12);
-    ctx.fillStyle = hp > 50 ? '#22c55e' : (hp > 25 ? '#f59e0b' : '#ef4444');
-    ctx.fillRect(34, 36, Math.max(0, Math.min(188, (hp / 100) * 188)), 12);
-    np.tex.needsUpdate = true;
-  }
-
-  function createRemotePlayer(id, colorHex, skinKey = 'default') {
-    const group = new THREE.Group();
-    const rig = buildRealisticHumanoid(colorHex, skinKey); group.add(rig.root);
-    const np = makeNameplateSprite(); drawNameplate(np, id, 100, false); group.add(np.sprite);
-    const hitMesh = new THREE.Mesh(new THREE.BoxGeometry(1.3, 2.6, 1.3), new THREE.MeshBasicMaterial({ visible: false }));
-    hitMesh.position.y = 1.3; hitMesh.userData = { isPlayer: true, playerId: id }; group.add(hitMesh);
-    scene.add(group); intersectableObjects.push(hitMesh);
-    const kb = new CANNON.Body({ mass: 0, type: CANNON.Body.KINEMATIC, material: pm });
-    kb.addShape(new CANNON.Sphere(playerRadius)); kb.position.set(0, -500, 0); world.addBody(kb);
-    const marbleM = new THREE.Mesh(marbleGeo, makeMarbleMat(colorHex)); marbleM.castShadow = true; marbleM.visible = false; scene.add(marbleM);
-    return {
-      id, body: kb, driving: false, group, rig, np, hitMesh, marbleMesh: marbleM,
-      mq: new THREE.Quaternion(), targetPos: new THREE.Vector3(0, 10, 0), prevPos: new THREE.Vector3(0, 10, 0),
-      targetRotY: 0, isShattered: false, baseColor: colorHex, skin: skinKey, hp: 100, isAdmin: false
     };
   }
+
+  function sendPacket(o) { if (socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(o)); }
 
   function updateOrCreateRemotePlayer(d) {
-    if (!remotePlayers[d.id]) remotePlayers[d.id] = createRemotePlayer(d.id, isHex(d.color) ? d.color : '#ffffff', d.skin || 'default');
+    if (!remotePlayers[d.id]) remotePlayers[d.id] = createRemotePlayer(d.id, isHex(d.color) ? d.color : '#fff', d.skin || 'default');
     const rp = remotePlayers[d.id];
-    const newSkin = d.skin || 'default';
-    if ((isHex(d.color) && d.color !== rp.baseColor) || newSkin !== rp.skin) {
-      rp.baseColor = isHex(d.color) ? d.color : rp.baseColor; rp.skin = newSkin;
-      rp.group.remove(rp.rig.root); rp.rig = buildRealisticHumanoid(rp.baseColor, rp.skin); rp.group.add(rp.rig.root);
-    }
-    const newHp = d.hp !== undefined ? d.hp : 100;
-    const newAdm = !!d.isAdmin;
-    if (newHp !== rp.hp || newAdm !== rp.isAdmin) {
-      rp.hp = newHp; rp.isAdmin = newAdm; drawNameplate(rp.np, d.id, rp.hp, rp.isAdmin);
-      if (adminModal.style.display === 'block') renderAdminModal();
-    }
     rp.targetPos.set(d.x, d.y - playerRadius, d.z); rp.targetRotY = d.yaw || 0;
-    rp.isShattered = !!d.isShattered;
-    const m = !!d.marble; rp.driving = !!d.driving;
-    if (d.mq) rp.mq.set(d.mq[0], d.mq[1], d.mq[2], d.mq[3]);
-    rp.rig.root.visible = !m;
-    const vis = !rp.isShattered && !d.driving;
-    rp.group.visible = rp.hitMesh.visible = vis; rp.marbleMesh.visible = vis && m;
+    rp.group.position.lerp(rp.targetPos, 0.25);
   }
 
   function removeRemotePlayer(id) {
-    const rp = remotePlayers[id]; if (!rp) return;
-    for (const cid in activeCars) if (activeCars[cid].driverId === id) activeCars[cid].driverId = null;
-    world.removeBody(rp.body); scene.remove(rp.group); scene.remove(rp.marbleMesh);
-    const i = intersectableObjects.indexOf(rp.hitMesh); if (i > -1) intersectableObjects.splice(i, 1);
-    delete remotePlayers[id]; if (adminModal.style.display === 'block') renderAdminModal();
+    if (!remotePlayers[id]) return;
+    scene.remove(remotePlayers[id].group); scene.remove(remotePlayers[id].marbleMesh);
+    delete remotePlayers[id];
+  }
+
+  function createRemotePlayer(id, colorHex, skinKey) {
+    const group = new THREE.Group();
+    const rig = buildRealisticHumanoid(colorHex, skinKey); group.add(rig.root);
+    scene.add(group);
+    return { id, group, rig, targetPos: new THREE.Vector3(), prevPos: new THREE.Vector3(), targetRotY: 0, marbleMesh: new THREE.Mesh() };
   }
 
   function syncPlayerState(force) {
     if (!isPlaying || !isConnected) return;
-    const now = Date.now();
-    if (!force && now - lastSyncTime < 45) return;
-    lastSyncTime = now;
-    const pos = drivingCar ? drivingCar.body.position : (localRagdoll ? localRagdoll.torso.position : playerBody.position);
-    sendPacket({
-      type: 'playerUpdate', id: _uid, x: pos.x, y: pos.y, z: pos.z, yaw: yawObj.rotation.y,
-      color: myColor, skin: mySkin, hp: _0xV.getHp(), isShattered: isShatteredLocal, driving: !!drivingCar,
-      rag: localRagdoll ? ragPose(localRagdoll) : undefined, marble: marbleMode,
-      mq: [playerBody.quaternion.x, playerBody.quaternion.y, playerBody.quaternion.z, playerBody.quaternion.w]
-    });
-    if (drivingCar) sendCarState(drivingCar);
+    sendPacket({ type: 'playerUpdate', id: _uid, x: playerBody.position.x, y: playerBody.position.y, z: playerBody.position.z, yaw: yawObj.rotation.y, color: myColor, skin: mySkin, hp: _0xV.getHp() });
   }
 
-  const escapeHTML = (s) => String(s).replace(/[&<>'"]/g, (t) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[t]));
-  function appendChatMessage(uid, color, text) {
-    const div = _d.createElement('div'); div.className = 'chat-msg';
-    div.innerHTML = `<span style="color:${isHex(color) ? color : '#facc15'};font-weight:bold">${escapeHTML(String(uid).substring(0, 14))}:</span> <span class="text-gray-200">${escapeHTML(text)}</span>`;
-    chatMessages.appendChild(div);
-    while (chatMessages.children.length > 25) chatMessages.removeChild(chatMessages.firstChild);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-  }
-  function sendChat() {
-    const text = chatInput.value.trim(); if (!text) return;
-    if (isConnected) sendPacket({ type: 'chat', uid: _uid, color: myColor, text }); else appendChatMessage(_uid, myColor, text);
-    chatInput.value = '';
-  }
-  chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendChat(); });
-
+  // Kontroller & Animasyon Döngüsü
   const activeActions = { forward: false, backward: false, left: false, right: false, jump: false };
   let mouseLocked = false;
   _d.addEventListener('mousemove', (e) => {
     if (!mouseLocked || !isPlaying) return;
     yawObj.rotation.y -= (e.movementX || 0) * 0.002 * lookSensitivity;
-    pitchObj.rotation.x += (e.movementY || 0) * 0.002 * lookSensitivity * (invertY ? 1 : -1);
-    pitchObj.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitchObj.rotation.x));
+    pitchObj.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, pitchObj.rotation.x - (e.movementY || 0) * 0.002));
   });
   _d.addEventListener('mousedown', (e) => {
-    if (!isPlaying || isShatteredLocal || settingsModal.style.display === 'block' || keybindsModal.style.display === 'block' || adminModal.style.display === 'block' || buildMenu.style.display === 'block' || e.target.closest('.ui-btn,#vehiclePrompt,#chatContainer,#mobileControls,#buildMenu,#keybindsModal,#adminModal')) return;
+    if (!isPlaying) return;
     if (!mouseLocked) _d.body.requestPointerLock();
     else if (e.button === 0) triggerWeaponAction();
-    else if (e.button === 2) spawnObject(selectedObj);
   });
   _d.addEventListener('pointerlockchange', () => (mouseLocked = _d.pointerLockElement === _d.body));
 
-  const normalizeKeyName = (e) => e.code === 'Space' ? 'space' : e.key.toLowerCase();
-
   _w.addEventListener('keydown', (e) => {
-    if (listeningKeyAction) {
-      e.preventDefault(); const kn = normalizeKeyName(e);
-      if (kn !== 'escape' && kn !== 'enter') { keybinds[listeningKeyAction] = kn; saveKeybinds(); }
-      listeningKeyAction = null; renderKeybindsModal(); return;
-    }
     if (!isPlaying) return;
-    if (e.key === 'Enter') {
-      if (_d.activeElement === chatInput) { sendChat(); chatInput.blur(); if (innerWidth > 768 && settingsModal.style.display !== 'block' && adminModal.style.display !== 'block') _d.body.requestPointerLock(); }
-      else { if (mouseLocked) _d.exitPointerLock(); chatInput.focus(); } return;
-    }
-    if (['chatInput', 'admAnnounceInput', 'startAdminPassInput'].includes(_d.activeElement?.id)) return;
-
-    const k = normalizeKeyName(e);
-    if (k === keybinds.interactCar) return handleInteractKey();
-    if (k === keybinds.fullscreen) return toggleFullscreen();
-    if (k === keybinds.ragdoll) return toggleRagdoll();
-    if (k === keybinds.marble) return toggleMarble();
-    if (k === keybinds.camView) return toggleCameraView();
-    if (k === keybinds.adminMenu) return toggleAdminModal();
-    if (k === keybinds.buildMenu) return toggleBuildMenu();
-    if (k === keybinds.quickSpawn) return spawnObject(selectedObj);
-    if (k === keybinds.randomSpawn) return spawnRandomItem();
-    if (k === keybinds.fingerMode) return cycleWeaponMode();
-    if (k === keybinds.rotateObj) return rotateSelectedObject();
-    if (k === keybinds.deleteObj) return deleteAimed();
-    if (k === keybinds.keybinds) return toggleKeybindsModal();
-
-    if (k === keybinds.forward) activeActions.forward = true;
-    if (k === keybinds.backward) activeActions.backward = true;
-    if (k === keybinds.left) activeActions.left = true;
-    if (k === keybinds.right) activeActions.right = true;
-    if (k === keybinds.jump) { activeActions.jump = true; tryJump(); }
+    const k = e.key.toLowerCase();
+    if (k === 'w') activeActions.forward = true;
+    if (k === 's') activeActions.backward = true;
+    if (k === 'a') activeActions.left = true;
+    if (k === 'd') activeActions.right = true;
+    if (e.code === 'Space') tryJump();
+    if (k === 'v') cycleWeaponMode();
   });
-
   _w.addEventListener('keyup', (e) => {
-    const k = normalizeKeyName(e);
-    if (k === keybinds.forward) activeActions.forward = false;
-    if (k === keybinds.backward) activeActions.backward = false;
-    if (k === keybinds.left) activeActions.left = false;
-    if (k === keybinds.right) activeActions.right = false;
-    if (k === keybinds.jump) activeActions.jump = false;
+    const k = e.key.toLowerCase();
+    if (k === 'w') activeActions.forward = false;
+    if (k === 's') activeActions.backward = false;
+    if (k === 'a') activeActions.left = false;
+    if (k === 'd') activeActions.right = false;
   });
-
-  _w.addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
 
   const clock = new THREE.Clock();
-  let frames = 0, fpsTimer = 0;
-
   function animate() {
     requestAnimationFrame(animate);
-    const raw = clock.getDelta(), dt = Math.min(raw, 0.05);
-    frames++; fpsTimer += raw;
-    if (fpsTimer >= 0.5) { $('fpsCounter').innerText = Math.round(frames / fpsTimer) + ' FPS'; frames = 0; fpsTimer = 0; }
-    if (jumpCooldown > 0) jumpCooldown -= dt;
+    const dt = Math.min(clock.getDelta(), 0.05);
 
-    mapStatues.forEach((st) => { st.rig.root.rotation.y += dt * 0.9; });
+    // Haritadaki Silahları Toplama Kontrolü
+    worldWeapons.forEach(wt => {
+      if (!wt.collected && playerBody.position.distanceTo(wt.mesh.position) < 2.5) {
+        unlocKilledWeapons[wt.id] = true;
+        wt.mesh.visible = false;
+        wt.collected = true;
+        appendChatMessage('SİSTEM', '#34d399', `🎉 ${wt.name} silahını bulup aldınız! V tuşu ile seçebilirsiniz.`);
+      }
+    });
 
-    // Gravity Gun ile tutulan objeyi oyuncunun önünde taşıma
     if (grabbedProp && grabbedProp.body) {
       const aim = new THREE.Vector3(); camera.getWorldDirection(aim);
-      const targetPos = playerBody.position.clone().addScaledVector(aim, 5);
-      grabbedProp.body.position.copy(targetPos);
+      grabbedProp.body.position.copy(playerBody.position.clone().addScaledVector(aim, 5));
       grabbedProp.body.velocity.set(0, 0, 0);
-      grabbedProp.body.angularVelocity.set(0, 0, 0);
-    }
-
-    for (const id in activeCars) {
-      const c = activeCars[id];
-      if (c === drivingCar) continue;
-      const b = c.body;
-      b.position.x += (c.tp.x - b.position.x) * 0.3; b.position.y += (c.tp.y - b.position.y) * 0.3; b.position.z += (c.tp.z - b.position.z) * 0.3;
-      tmpQ.set(b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w).slerp(c.tq, 0.3);
-      b.quaternion.set(tmpQ.x, tmpQ.y, tmpQ.z, tmpQ.w); syncBodyAABB(b);
-    }
-
-    let throttle = 0, steer = 0;
-    if (isPlaying && !isShatteredLocal) {
-      if (_d.activeElement !== chatInput) {
-        if (activeActions.forward) throttle++; if (activeActions.backward) throttle--;
-        if (activeActions.left) steer++; if (activeActions.right) steer--;
-      }
-      if (drivingCar) {
-        const c = drivingCar, v = c.vehicle, spd = c.body.velocity.length();
-        const f = (throttle > 0 && spd > 38) ? 0 : -throttle * 950;
-        v.applyEngineForce(f, 2); v.applyEngineForce(f, 3);
-        const brake = activeActions.jump ? 40 : (throttle === 0 ? 4 : 0);
-        for (let i = 0; i < 4; i++) v.setBrake(brake, i);
-        c.steer += (steer * 0.5 - c.steer) * Math.min(1, 8 * dt);
-        v.setSteeringValue(c.steer, 0); v.setSteeringValue(c.steer, 1);
-      }
     }
 
     world.step(1 / 60, dt, 3);
-    updateRagdolls(dt);
-    if (localRagdoll) { playerObj.position.copy(localRagdoll.torso.position); syncPlayerState(); }
-
-    if (isPlaying && !isShatteredLocal) {
-      if (drivingCar) {
-        vehiclePrompt.classList.remove('hidden');
-        vehiclePrompt.innerText = `Sürüş — İn: [${keybinds.interactCar.toUpperCase()}]`;
-        playerObj.position.copy(drivingCar.body.position); syncPlayerState();
-      } else {
-        if (activeActions.jump) tryJump();
-        if (_0xV.getFly() && !activeActions.jump) playerBody.velocity.y = 0;
-        if (playerBody.position.y < -30) { playerBody.position.set(0, 15, 8); playerBody.velocity.set(0, 0, 0); }
-        if (playerBody.velocity.y < -45) playerBody.velocity.y = -45;
-        const spdM = _0xV.getSpd();
-        const mv = new THREE.Vector3(-steer, 0, -throttle);
-        if (mv.lengthSq() > 0) {
-          mv.normalize(); mv.applyAxisAngle(new THREE.Vector3(0, 1, 0), yawObj.rotation.y);
-          walkBobTimer += dt * 10 * spdM;
-        }
-        mv.multiplyScalar(15 * spdM);
-        playerBody.velocity.x = mv.x; playerBody.velocity.z = mv.z;
-        playerObj.position.copy(playerBody.position);
-
-        localRig.root.visible = thirdPerson && !marbleMode;
-        localRig.root.position.set(playerBody.position.x, playerBody.position.y - playerRadius, playerBody.position.z);
-        localRig.root.rotation.y = yawObj.rotation.y;
-        animateHumanoidRig(localRig, Math.hypot(playerBody.velocity.x, playerBody.velocity.z), dt, true);
-
-        const nearStatue = findNearestStatue();
-        if (nearStatue) {
-          vehiclePrompt.classList.remove('hidden');
-          vehiclePrompt.innerText = `${nearStatue.title} — Kuşan: [${keybinds.interactCar.toUpperCase()}]`;
-        } else if (findNearestAvailableCar()) {
-          vehiclePrompt.classList.remove('hidden');
-          vehiclePrompt.innerText = `Arabaya Bin: [${keybinds.interactCar.toUpperCase()}] 🚗`;
-        } else { vehiclePrompt.classList.add('hidden'); }
-        syncPlayerState();
-      }
+    if (isPlaying) {
+      const mv = new THREE.Vector3((activeActions.left ? 1 : 0) - (activeActions.right ? 1 : 0), 0, (activeActions.forward ? 1 : 0) - (activeActions.backward ? 1 : 0));
+      if (mv.lengthSq() > 0) mv.normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), yawObj.rotation.y);
+      mv.multiplyScalar(15 * _0xV.getSpd());
+      playerBody.velocity.x = mv.x; playerBody.velocity.z = mv.z;
+      playerObj.position.copy(playerBody.position);
+      syncPlayerState();
     }
 
-    if (isPlaying && showGhost && !drivingCar && !isShatteredLocal) {
-      const tr = computePlacementTransform(selectedObj);
-      ghostMesh.position.set(tr.x, tr.y, tr.z); ghostMesh.quaternion.copy(tr.q); ghostMesh.visible = true;
-    } else ghostMesh.visible = false;
-
-    for (const id in activeCars) {
-      const c = activeCars[id];
-      c.group.position.copy(c.body.position); c.group.quaternion.copy(c.body.quaternion);
-    }
     for (const id in activeProps) {
       const p = activeProps[id]; if (p.isStatic) continue;
       p.mesh.position.copy(p.body.position); p.mesh.quaternion.copy(p.body.quaternion);
-    }
-    for (const id in remotePlayers) {
-      const rp = remotePlayers[id];
-      if (rp.isShattered) { rp.body.position.set(0, -500, 0); syncBodyAABB(rp.body); continue; }
-      rp.group.position.lerp(rp.targetPos, 0.25);
-      const moveSpd = rp.group.position.distanceTo(rp.prevPos) / Math.max(dt, 0.001);
-      rp.prevPos.copy(rp.group.position); animateHumanoidRig(rp.rig, moveSpd, dt, true);
-      const diff = rp.targetRotY - rp.group.rotation.y;
-      rp.group.rotation.y += Math.atan2(Math.sin(diff), Math.cos(diff)) * 0.25;
-      if (rp.driving) rp.body.position.set(0, -500, 0);
-      else rp.body.position.set(rp.group.position.x, rp.group.position.y + playerRadius, rp.group.position.z);
-      syncBodyAABB(rp.body);
     }
 
     renderer.render(scene, camera);
   }
 
-  $('connectBtn').addEventListener('click', (e) => { e.preventDefault(); connectToServer(); });
-  $('playBtn').addEventListener('click', (e) => {
-    e.preventDefault();
+  $('connectBtn').addEventListener('click', () => connectToServer());
+  $('playBtn').addEventListener('click', () => {
     if (!isConnected) connectToServer();
     startScreen.classList.add('hidden'); crosshair.classList.remove('hidden');
     $('hpContainer').classList.remove('hidden'); updateHpUI(100);
